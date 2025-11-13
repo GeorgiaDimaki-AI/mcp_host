@@ -8,7 +8,10 @@ import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { readFileSync, existsSync } from 'fs';
 import { OllamaService, OllamaMessage } from './services/ollama.js';
+import { MCPService, MCPServer } from './services/mcp.js';
+import { createMCPRouter } from './routes/mcp.js';
 
 dotenv.config();
 
@@ -23,6 +26,46 @@ const DEFAULT_MODEL = process.env.DEFAULT_MODEL || 'llama2';
 // Initialize Ollama service
 const ollama = new OllamaService(OLLAMA_BASE_URL);
 
+// Initialize MCP service
+const mcpService = new MCPService();
+let mcpInitialized = false;
+
+// Load MCP configuration
+async function initializeMCP() {
+  try {
+    const configPath = './mcp-config.json';
+
+    if (existsSync(configPath)) {
+      const configData = readFileSync(configPath, 'utf-8');
+      const config = JSON.parse(configData);
+
+      if (config.mcpServers && Object.keys(config.mcpServers).length > 0) {
+        const servers: MCPServer[] = Object.entries(config.mcpServers).map(
+          ([name, serverConfig]: [string, any]) => ({
+            name,
+            command: serverConfig.command,
+            args: serverConfig.args,
+            env: serverConfig.env,
+          })
+        );
+
+        await mcpService.initialize(servers);
+        mcpInitialized = true;
+        console.log(`MCP initialized with ${servers.length} server(s)`);
+      } else {
+        console.log('No MCP servers configured');
+      }
+    } else {
+      console.log('No MCP configuration file found');
+    }
+  } catch (error) {
+    console.error('Error initializing MCP:', error);
+  }
+}
+
+// Initialize MCP on startup
+initializeMCP();
+
 // Middleware
 app.use(cors({
   origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
@@ -35,6 +78,7 @@ app.get('/api/health', async (req, res) => {
   res.json({
     status: 'ok',
     ollama: ollamaHealthy ? 'connected' : 'disconnected',
+    mcp: mcpInitialized ? 'connected' : 'not configured',
   });
 });
 
@@ -48,6 +92,9 @@ app.get('/api/models', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch models' });
   }
 });
+
+// Mount MCP routes
+app.use('/api/mcp', createMCPRouter(mcpService));
 
 // WebSocket connection handler
 wss.on('connection', (ws: WebSocket) => {
@@ -142,8 +189,28 @@ server.listen(PORT, () => {
 });
 
 // Graceful shutdown
-process.on('SIGTERM', () => {
+process.on('SIGTERM', async () => {
   console.log('SIGTERM received, closing server...');
+
+  // Disconnect MCP
+  if (mcpInitialized) {
+    await mcpService.disconnect();
+  }
+
+  server.close(() => {
+    console.log('Server closed');
+    process.exit(0);
+  });
+});
+
+process.on('SIGINT', async () => {
+  console.log('SIGINT received, closing server...');
+
+  // Disconnect MCP
+  if (mcpInitialized) {
+    await mcpService.disconnect();
+  }
+
   server.close(() => {
     console.log('Server closed');
     process.exit(0);

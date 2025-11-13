@@ -14,6 +14,9 @@ build/
 .env.local
 .env.*.local
 
+# MCP configuration (keep .example files)
+backend/mcp-config.json
+
 # IDE
 .vscode/
 .idea/
