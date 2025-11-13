@@ -113,29 +113,19 @@ export function WebviewRenderer({ content, onMessage }: WebviewRendererProps) {
 
   if (error) {
     return (
-      <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
+      <div className="p-4 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
         <strong>Error rendering webview:</strong> {error}
       </div>
     );
   }
 
   return (
-    <div className="webview-container border border-gray-200 rounded-lg overflow-hidden bg-white">
-      <div className="bg-gray-50 px-3 py-2 border-b border-gray-200">
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-gray-400"></div>
-          <span className="text-xs text-gray-600 font-medium">
-            {content.type === 'form' ? 'Interactive Form' :
-             content.type === 'result' ? 'Result' : 'HTML View'}
-          </span>
-        </div>
-      </div>
-      <iframe
-        ref={iframeRef}
-        sandbox="allow-scripts allow-forms"
-        className="w-full h-64 border-0"
-        title="webview"
-      />
-    </div>
+    <iframe
+      ref={iframeRef}
+      sandbox="allow-scripts allow-forms"
+      className="w-full border-0"
+      style={{ minHeight: '250px' }}
+      title="webview"
+    />
   );
 }
