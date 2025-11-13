@@ -1,14 +1,16 @@
 /**
  * Chat Component
- * Main chat interface container
+ * Main chat interface container with MCP webview support
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { Message, WebSocketMessage } from '../../types';
+import { Message, WebSocketMessage, MCPWebviewDisplay, MCPTool } from '../../types';
 import { WebSocketService } from '../../services/websocket';
 import { api } from '../../services/api';
+import { mcpApi } from '../../services/mcp-api';
 import { MessageList } from '../MessageList/MessageList';
 import { ChatInput } from './ChatInput';
+import { WebviewRenderer } from '../Webview/WebviewRenderer';
 
 const wsService = new WebSocketService('ws://localhost:3000');
 
@@ -19,6 +21,11 @@ export function Chat() {
   const [currentModel, setCurrentModel] = useState('llama2');
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [streamingContent, setStreamingContent] = useState('');
+
+  // MCP-specific state
+  const [mcpWebviews, setMcpWebviews] = useState<MCPWebviewDisplay[]>([]);
+  const [mcpTools, setMcpTools] = useState<MCPTool[]>([]);
+  const [showMcpTools, setShowMcpTools] = useState(false);
 
   // Initialize WebSocket connection
   useEffect(() => {
@@ -43,6 +50,18 @@ export function Chat() {
       })
       .catch((error) => {
         console.error('Failed to load models:', error);
+      });
+
+    // Load MCP tools
+    mcpApi.listTools()
+      .then((tools) => {
+        setMcpTools(tools);
+        if (tools.length > 0) {
+          console.log(`Loaded ${tools.length} MCP tool(s)`);
+        }
+      })
+      .catch((error) => {
+        console.error('Failed to load MCP tools:', error);
       });
 
     return () => {
@@ -115,6 +134,7 @@ export function Chat() {
       webview = {
         type: type as 'html' | 'form' | 'result',
         html: html.trim(),
+        source: 'chat' as const, // Mark as chat-generated
       };
     }
 
@@ -189,10 +209,72 @@ Use webviews when it makes sense - for collecting data, showing visualizations, 
 
   const handleWebviewMessage = (messageId: string, data: any) => {
     console.log('Webview message from', messageId, ':', data);
-    // Handle form submissions or other webview interactions
-    if (data.type === 'form-submit') {
-      const formData = JSON.stringify(data.formData, null, 2);
-      handleSendMessage(`Form submitted with data:\n${formData}`);
+
+    // Check if this is an MCP webview
+    const mcpWebview = mcpWebviews.find(w => w.id === messageId);
+
+    if (mcpWebview) {
+      // MCP webview - handle directly WITHOUT going through chat
+      console.log('MCP webview response:', data);
+
+      if (mcpWebview.onResponse) {
+        mcpWebview.onResponse(data);
+      }
+
+      // For MCP webviews, show a system message but don't send to LLM
+      if (data.type === 'form-submit') {
+        addSystemMessage(`✓ Data collected from ${mcpWebview.toolName}`);
+        // Remove the MCP webview after submission
+        setMcpWebviews(prev => prev.filter(w => w.id !== messageId));
+      }
+    } else {
+      // Chat webview - only send to LLM if it's a form submission
+      const chatMessage = messages.find(m => m.id === messageId);
+
+      // IMPORTANT: Only send to LLM if it's a chat-generated webview AND form submission
+      if (chatMessage?.webview?.source === 'chat' && data.type === 'form-submit') {
+        const formData = JSON.stringify(data.formData, null, 2);
+        handleSendMessage(`Form submitted with data:\n${formData}`);
+      }
+    }
+  };
+
+  // Call an MCP tool and display its webview (if any) directly
+  const callMCPTool = async (serverName: string, toolName: string, args: any = {}) => {
+    try {
+      const result = await mcpApi.callTool(serverName, toolName, args);
+
+      if (result.hasWebview && result.webviewHtml && result.webviewType) {
+        // Create MCP webview display - does NOT go into chat history
+        const mcpWebview: MCPWebviewDisplay = {
+          id: 'mcp-' + Date.now(),
+          serverName,
+          toolName,
+          timestamp: Date.now(),
+          webview: {
+            type: result.webviewType,
+            html: result.webviewHtml,
+            source: 'mcp',
+            mcpServer: serverName,
+            mcpTool: toolName,
+          },
+          onResponse: (data) => {
+            console.log(`MCP tool ${toolName} received:`, data);
+            // Here you can call another MCP tool with the collected data
+            // or perform any other action WITHOUT involving the LLM
+          },
+        };
+
+        setMcpWebviews(prev => [...prev, mcpWebview]);
+      }
+
+      // Show text content as system message (if any)
+      if (result.content) {
+        addSystemMessage(`MCP ${toolName}: ${result.content}`);
+      }
+    } catch (error) {
+      console.error('Error calling MCP tool:', error);
+      addSystemMessage(`Error calling MCP tool: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -205,6 +287,7 @@ Use webviews when it makes sense - for collecting data, showing visualizations, 
       timestamp: Date.now(),
       webview: {
         type: 'form',
+        source: 'chat',
         html: `
           <form id="demoForm">
             <label>Full Name:</label>
@@ -253,6 +336,7 @@ Use webviews when it makes sense - for collecting data, showing visualizations, 
       timestamp: Date.now(),
       webview: {
         type: 'result',
+        source: 'chat',
         html: `
           <div style="padding: 16px;">
             <h3 style="margin: 0 0 16px 0; color: #1f2937;">Monthly Sales Report</h3>
@@ -318,6 +402,7 @@ Use webviews when it makes sense - for collecting data, showing visualizations, 
       timestamp: Date.now(),
       webview: {
         type: 'html',
+        source: 'chat',
         html: `
           <div style="max-width: 320px; margin: 0 auto; padding: 16px;">
             <h3 style="margin: 0 0 16px 0; text-align: center; color: #1f2937;">Simple Calculator</h3>
@@ -380,6 +465,11 @@ Use webviews when it makes sense - for collecting data, showing visualizations, 
               ) : (
                 <span className="text-red-600">● Disconnected</span>
               )}
+              {mcpTools.length > 0 && (
+                <span className="ml-3 text-blue-600">
+                  {mcpTools.length} MCP tool{mcpTools.length > 1 ? 's' : ''}
+                </span>
+              )}
             </p>
           </div>
 
@@ -409,6 +499,17 @@ Use webviews when it makes sense - for collecting data, showing visualizations, 
               </button>
             </div>
 
+            {/* MCP Tools button */}
+            {mcpTools.length > 0 && (
+              <button
+                onClick={() => setShowMcpTools(!showMcpTools)}
+                className="px-3 py-1.5 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors font-medium"
+                title="Show MCP tools"
+              >
+                MCP Tools
+              </button>
+            )}
+
             {/* Model selector */}
             {availableModels.length > 0 && (
               <select
@@ -424,6 +525,64 @@ Use webviews when it makes sense - for collecting data, showing visualizations, 
           </div>
         </div>
       </div>
+
+      {/* MCP Tools Panel */}
+      {showMcpTools && mcpTools.length > 0 && (
+        <div className="bg-blue-50 border-b border-blue-200 px-4 py-3">
+          <div className="max-w-6xl mx-auto">
+            <div className="text-sm font-medium text-blue-900 mb-2">Available MCP Tools:</div>
+            <div className="grid grid-cols-2 gap-2">
+              {mcpTools.map(tool => (
+                <button
+                  key={`${tool.serverName}-${tool.name}`}
+                  onClick={() => callMCPTool(tool.serverName, tool.name)}
+                  className="text-left px-3 py-2 bg-white rounded border border-blue-200 hover:border-blue-400 transition-colors"
+                >
+                  <div className="font-medium text-sm text-blue-900">{tool.name}</div>
+                  <div className="text-xs text-gray-600">{tool.description}</div>
+                  <div className="text-xs text-blue-600 mt-1">Server: {tool.serverName}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MCP Webviews Overlay */}
+      {mcpWebviews.map(webview => (
+        <div
+          key={webview.id}
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          onClick={() => setMcpWebviews(prev => prev.filter(w => w.id !== webview.id))}
+        >
+          <div
+            className="bg-white rounded-lg shadow-2xl max-w-2xl w-full m-4 max-h-[80vh] overflow-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-3 flex items-center justify-between">
+              <div>
+                <div className="font-semibold">{webview.toolName}</div>
+                <div className="text-xs opacity-90">MCP Server: {webview.serverName}</div>
+              </div>
+              <button
+                onClick={() => setMcpWebviews(prev => prev.filter(w => w.id !== webview.id))}
+                className="text-white hover:bg-white hover:bg-opacity-20 rounded px-2 py-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-4">
+              <WebviewRenderer
+                content={webview.webview}
+                onMessage={(data) => handleWebviewMessage(webview.id, data)}
+              />
+            </div>
+          </div>
+        </div>
+      ))}
 
       {/* Messages */}
       <MessageList

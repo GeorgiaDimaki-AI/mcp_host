@@ -14,6 +14,9 @@ export interface WebviewContent {
   type: 'html' | 'form' | 'result';
   html: string;
   metadata?: Record<string, any>;
+  source?: 'chat' | 'mcp'; // Source of the webview
+  mcpServer?: string; // MCP server name if source is 'mcp'
+  mcpTool?: string; // MCP tool name if source is 'mcp'
 }
 
 export interface ChatState {
@@ -44,4 +47,27 @@ export interface SendMessageRequest {
     top_p?: number;
     top_k?: number;
   };
+}
+
+export interface MCPTool {
+  name: string;
+  description: string;
+  inputSchema: any;
+  serverName: string;
+}
+
+export interface MCPToolResult {
+  content: string;
+  hasWebview: boolean;
+  webviewType?: 'form' | 'result' | 'html';
+  webviewHtml?: string;
+}
+
+export interface MCPWebviewDisplay {
+  id: string;
+  serverName: string;
+  toolName: string;
+  webview: WebviewContent;
+  timestamp: number;
+  onResponse?: (data: any) => void;
 }

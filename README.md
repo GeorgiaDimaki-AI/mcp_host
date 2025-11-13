@@ -83,24 +83,48 @@ npm run dev
 
 ## MCP Integration
 
-The application supports **Model Context Protocol (MCP)** for extensibility:
+The application supports **Model Context Protocol (MCP)** for extensibility with a unique feature: **Direct Webview Elicitation** that bypasses the LLM for privacy and security.
 
-- Connect to MCP servers for external tools and data sources
-- MCP tools can return webviews for data collection (forms) or result presentation
-- Configure servers in `backend/mcp-config.json`
-- See [MCP_GUIDE.md](./MCP_GUIDE.md) for detailed documentation
+### Key Features
 
-**Example use cases:**
-- Database query tools that return interactive result tables
-- Configuration wizards that present forms
-- API explorers with dynamic parameter collection
-- Data visualization tools
+- **Direct Rendering:** MCP webviews are displayed in modal overlays, NOT in chat history
+- **Privacy:** Data collected from MCP webviews never touches the LLM
+- **Secure Data Collection:** Perfect for collecting credentials, API keys, personal info
+- **Interactive Wizards:** Multi-step forms and workflows
+- **Configure servers** in `backend/mcp-config.json`
+
+### How It Works
+
+```
+User clicks MCP tool → Webview displayed in modal
+       ↓
+User fills form → Data sent directly to MCP server
+       ↓
+LLM never sees the data → Perfect for sensitive information
+```
+
+### Example Use Cases
+
+- **Credential Collection:** API keys, database passwords
+- **Configuration Wizards:** Multi-step setup processes
+- **Data Query Builders:** Interactive database query construction
+- **Feedback Forms:** User surveys and feedback
+- **File Uploads:** Process files without LLM involvement
+
+### Quick Start
+
+1. See complete working example: [`examples/mcp-webview-example.js`](./examples/mcp-webview-example.js)
+2. Read developer guide: [MCP_WEBVIEW_DEVELOPER_GUIDE.md](./MCP_WEBVIEW_DEVELOPER_GUIDE.md)
+3. Configure your server in `backend/mcp-config.json`
+4. Click "MCP Tools" button in the UI
 
 ## Documentation
 
 - [QUICKSTART.md](./QUICKSTART.md) - Quick start guide
 - [WEBVIEW_GUIDE.md](./WEBVIEW_GUIDE.md) - Webview usage and examples
-- [MCP_GUIDE.md](./MCP_GUIDE.md) - MCP integration guide
+- [MCP_GUIDE.md](./MCP_GUIDE.md) - MCP integration overview
+- [MCP_WEBVIEW_DEVELOPER_GUIDE.md](./MCP_WEBVIEW_DEVELOPER_GUIDE.md) - **Complete guide to creating MCP servers with webviews**
+- [examples/mcp-webview-example.js](./examples/mcp-webview-example.js) - **Working MCP server example**
 
 ## Development
 
