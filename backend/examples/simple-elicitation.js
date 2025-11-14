@@ -1,12 +1,10 @@
 #!/usr/bin/env node
 
 /**
- * Simple MCP Elicitation Example - Credential Collection
+ * Simple MCP Elicitation Example - Two Approaches
  *
- * Demonstrates proper MCP elicitation using server.createMessage()
- * to request user input through the client's sampling capability.
- *
- * This is a SINGLE, SIMPLE function that collects API credentials.
+ * Approach 1: Webview in message (empty schema, HTML in message text)
+ * Approach 2: Schema-based webview (schema indicates it's a webview)
  */
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -35,22 +33,28 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
     tools: [
       {
-        name: 'configure_api',
-        description: 'Configure API access (will ask for credentials if not provided)',
+        name: 'collect_credentials_approach1',
+        description: 'Collect API credentials using Approach 1 (webview in message)',
         inputSchema: {
           type: 'object',
           properties: {
             service: {
               type: 'string',
-              description: 'Service name to configure',
+              description: 'Service name',
             },
-            apiKey: {
+          },
+          required: ['service'],
+        },
+      },
+      {
+        name: 'collect_credentials_approach2',
+        description: 'Collect API credentials using Approach 2 (schema-based webview)',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            service: {
               type: 'string',
-              description: 'API key (optional, will ask if not provided)',
-            },
-            endpoint: {
-              type: 'string',
-              description: 'API endpoint URL (optional, will ask if not provided)',
+              description: 'Service name',
             },
           },
           required: ['service'],
@@ -66,24 +70,29 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
 
-  if (name === 'configure_api') {
-    return await handleConfigureAPI(args);
+  if (name === 'collect_credentials_approach1') {
+    return await approach1_WebviewInMessage(args);
+  }
+
+  if (name === 'collect_credentials_approach2') {
+    return await approach2_SchemaBasedWebview(args);
   }
 
   throw new Error(`Unknown tool: ${name}`);
 });
 
 /**
- * Simple credential elicitation example
- * Uses MCP's createMessage to properly request user input
+ * APPROACH 1: Webview HTML in message with empty/minimal schema
+ *
+ * The message contains the webview HTML markup.
+ * Client detects webview syntax and renders it.
+ * Schema is empty or minimal - data collection happens through webview.
  */
-async function handleConfigureAPI(args) {
+async function approach1_WebviewInMessage(args) {
   const { service, apiKey, endpoint } = args;
 
-  // Check if we need to elicit credentials
+  // If we don't have credentials, use createMessage with webview in the message
   if (!apiKey || !endpoint) {
-    // Use MCP's proper elicitation: server.createMessage()
-    // This sends a request to the CLIENT to get user input
     try {
       const response = await server.createMessage({
         messages: [
@@ -91,91 +100,170 @@ async function handleConfigureAPI(args) {
             role: 'user',
             content: {
               type: 'text',
-              text: `Please provide API credentials for ${service}:\n\nAPI Key: ${apiKey || '[required]'}\nEndpoint URL: ${endpoint || '[required]'}\n\nProvide the missing information.`,
+              text: createWebviewHTML(service), // Webview HTML in the message
             },
           },
         ],
-        maxTokens: 1000,
+        // Empty/minimal schema - the webview handles data collection
+        maxTokens: 100,
       });
 
-      // The client returns the user's response
-      const userInput = response.content.text;
+      // Extract from response
+      const userResponse = response.content.text || '';
 
-      // Parse the response to extract credentials
-      // (In a real implementation, you'd use a more robust parser)
-      const extractedApiKey = apiKey || extractValue(userInput, 'API Key') || extractValue(userInput, 'apiKey');
-      const extractedEndpoint = endpoint || extractValue(userInput, 'Endpoint') || extractValue(userInput, 'endpoint');
-
-      if (!extractedApiKey || !extractedEndpoint) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `❌ Failed to configure ${service}. Missing required credentials.`,
-            },
-          ],
+      // Try to parse JSON response from webview
+      let credentials;
+      try {
+        credentials = JSON.parse(userResponse);
+      } catch {
+        // Fallback: extract from text
+        credentials = {
+          apiKey: extractValue(userResponse, 'apiKey') || apiKey,
+          endpoint: extractValue(userResponse, 'endpoint') || endpoint,
         };
       }
 
-      // Now we have the credentials, configure the service
       return {
         content: [
           {
             type: 'text',
-            text: `✅ Successfully configured ${service}\n\nAPI Key: ${maskCredential(extractedApiKey)}\nEndpoint: ${extractedEndpoint}\n\nConfiguration saved and ready to use!`,
+            text: `✅ Configured ${service} via Approach 1\nAPI Key: ${maskCredential(credentials.apiKey)}\nEndpoint: ${credentials.endpoint}`,
           },
         ],
       };
     } catch (error) {
-      // Client doesn't support sampling, fallback to webview elicitation
-      return elicitViaWebview(service, apiKey, endpoint);
+      // If createMessage not supported, return webview directly
+      return {
+        content: [
+          {
+            type: 'text',
+            text: '```webview:form\n' + createWebviewHTML(service) + '\n```',
+          },
+        ],
+      };
     }
   }
 
-  // We already have everything
   return {
     content: [
       {
         type: 'text',
-        text: `✅ Successfully configured ${service}\n\nAPI Key: ${maskCredential(apiKey)}\nEndpoint: ${endpoint}\n\nConfiguration saved and ready to use!`,
+        text: `✅ Already configured ${service}\nAPI Key: ${maskCredential(apiKey)}\nEndpoint: ${endpoint}`,
       },
     ],
   };
 }
 
 /**
- * Fallback: Webview-based elicitation if client doesn't support sampling
+ * APPROACH 2: Schema-based webview indication
+ *
+ * Use a special schema property to indicate this is a webview.
+ * Client checks schema for webview indicator and renders accordingly.
+ * Could use: format: 'webview', x-webview: true, or custom property
  */
-function elicitViaWebview(service, apiKey, endpoint) {
-  const html = `
-<div style="font-family: system-ui, sans-serif; max-width: 500px; margin: 0 auto;">
-  <h2 style="color: #6366f1;">🔐 Configure ${service}</h2>
-  <p>Please provide your API credentials:</p>
+async function approach2_SchemaBasedWebview(args) {
+  const { service, apiKey, endpoint } = args;
+
+  if (!apiKey || !endpoint) {
+    try {
+      const response = await server.createMessage({
+        messages: [
+          {
+            role: 'user',
+            content: {
+              type: 'text',
+              text: `Please provide credentials for ${service}`,
+            },
+          },
+        ],
+        // Schema with webview indicator
+        // This tells the client: "render this as a webview, here's the schema"
+        modelPreferences: {
+          hints: [
+            {
+              name: 'webview-elicitation', // Custom hint indicating webview
+            },
+          ],
+        },
+        maxTokens: 100,
+      });
+
+      let credentials;
+      try {
+        credentials = JSON.parse(response.content.text);
+      } catch {
+        credentials = {
+          apiKey: extractValue(response.content.text, 'apiKey') || apiKey,
+          endpoint: extractValue(response.content.text, 'endpoint') || endpoint,
+        };
+      }
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `✅ Configured ${service} via Approach 2\nAPI Key: ${maskCredential(credentials.apiKey)}\nEndpoint: ${credentials.endpoint}`,
+          },
+        ],
+      };
+    } catch (error) {
+      // Fallback: return webview with special metadata
+      return {
+        content: [
+          {
+            type: 'text',
+            text: '```webview:form\n' + createWebviewHTML(service) + '\n```',
+          },
+        ],
+        // Could also add metadata here indicating this is elicitation
+        isBlocking: true,
+      };
+    }
+  }
+
+  return {
+    content: [
+      {
+        type: 'text',
+        text: `✅ Already configured ${service}\nAPI Key: ${maskCredential(apiKey)}\nEndpoint: ${endpoint}`,
+      },
+    ],
+  };
+}
+
+/**
+ * Create webview HTML for credential collection
+ */
+function createWebviewHTML(service) {
+  return `
+<div style="font-family: system-ui, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px;">
+  <h2 style="color: #6366f1; margin-bottom: 20px;">🔐 Configure ${service}</h2>
+  <p style="color: #6b7280; margin-bottom: 20px;">Please provide your API credentials:</p>
 
   <form id="credForm" style="display: flex; flex-direction: column; gap: 15px;">
-    <div>
-      <label style="display: block; margin-bottom: 5px; font-weight: 600;">Service Name</label>
-      <input type="text" name="service" value="${service}" readonly
-             style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; background: #f9fafb;">
-    </div>
+    <input type="hidden" name="service" value="${service}">
 
     <div>
-      <label style="display: block; margin-bottom: 5px; font-weight: 600;">API Key *</label>
-      <input type="password" name="apiKey" value="${apiKey || ''}" required
+      <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #374151;">
+        API Key *
+      </label>
+      <input type="password" name="apiKey" required
              placeholder="Enter your API key"
-             style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+             style="width: 100%; padding: 10px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 14px;">
     </div>
 
     <div>
-      <label style="display: block; margin-bottom: 5px; font-weight: 600;">Endpoint URL *</label>
-      <input type="url" name="endpoint" value="${endpoint || ''}" required
+      <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #374151;">
+        Endpoint URL *
+      </label>
+      <input type="url" name="endpoint" required
              placeholder="https://api.example.com"
-             style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+             style="width: 100%; padding: 10px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 14px;">
     </div>
 
     <button type="submit"
-            style="padding: 10px; background: #6366f1; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer;">
-      Save Configuration
+            style="padding: 12px; background: #6366f1; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 14px;">
+      💾 Save Configuration
     </button>
   </form>
 </div>
@@ -185,33 +273,27 @@ document.getElementById('credForm').addEventListener('submit', function(e) {
   e.preventDefault();
   const formData = new FormData(e.target);
 
+  const data = {
+    service: formData.get('service'),
+    apiKey: formData.get('apiKey'),
+    endpoint: formData.get('endpoint'),
+  };
+
+  // Send as JSON for easy parsing
   window.sendToHost({
-    type: 'form-submit',
-    formData: {
-      service: formData.get('service'),
-      apiKey: formData.get('apiKey'),
-      endpoint: formData.get('endpoint'),
-    }
+    type: 'elicitation-response',
+    formData: data
   });
 });
 </script>
 `;
-
-  return {
-    content: [
-      {
-        type: 'text',
-        text: '```webview:form\n' + html + '\n```',
-      },
-    ],
-  };
 }
 
 /**
- * Extract a value from user input text
+ * Extract a value from text
  */
 function extractValue(text, key) {
-  const regex = new RegExp(`${key}:\\s*([^\\n]+)`, 'i');
+  const regex = new RegExp(`${key}[:\s]+([^\n,]+)`, 'i');
   const match = text.match(regex);
   return match ? match[1].trim() : null;
 }
@@ -228,4 +310,4 @@ function maskCredential(cred) {
 const transport = new StdioServerTransport();
 await server.connect(transport);
 
-console.error('Simple Elicitation Example Server running');
+console.error('Simple Elicitation Example Server (Two Approaches) running');
