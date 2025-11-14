@@ -62,8 +62,31 @@ export class MCPService {
     }, {
       capabilities: {
         tools: {},
+        sampling: {}, // Enable sampling capability for proper MCP elicitation
       },
     });
+
+    // Set up handler for sampling requests (server.createMessage() calls)
+    client.setRequestHandler(
+      { method: 'sampling/createMessage' } as any,
+      async (request: any) => {
+        console.log('Server requested sampling (elicitation):', request);
+
+        // The server is requesting user input through sampling
+        // This is where we'd integrate with the frontend to show the prompt
+        // For now, we'll pass it through as a webview elicitation
+
+        return {
+          role: 'assistant',
+          content: {
+            type: 'text',
+            text: 'Elicitation via sampling not yet fully implemented. Please use webview fallback.',
+          },
+          model: 'user-input',
+          stopReason: 'endTurn',
+        };
+      }
+    );
 
     await client.connect(transport);
     this.clients.set(server.name, client);
