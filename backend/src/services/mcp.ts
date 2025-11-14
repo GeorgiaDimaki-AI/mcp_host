@@ -33,8 +33,13 @@ export interface MCPToolResult {
 export interface ElicitationRequest {
   serverName: string;
   message: string;
-  requestedSchema: any;
   requestId: string;
+  mode: 'form' | 'url';
+  // Form mode fields
+  requestedSchema?: any;
+  // URL mode fields
+  url?: string;
+  elicitationId?: string;
 }
 
 export interface ElicitationResponse {
@@ -89,9 +94,29 @@ export class MCPService extends EventEmitter {
       version: '1.0.0',
     }, {
       capabilities: {
-        elicitation: {}, // Enable elicitation capability
+        elicitation: {
+          form: {},  // Explicitly declare form mode support
+          url: {},   // Explicitly declare URL mode support
+        },
       },
     });
+
+    // Handle elicitation completion notifications (for URL mode)
+    client.setNotificationHandler(
+      { method: 'notifications/elicitation/complete' } as any,
+      async (notification: any) => {
+        console.log('Elicitation completed:', notification);
+        const elicitationId = notification.params?.elicitationId;
+
+        if (elicitationId) {
+          // Emit event that frontend can listen to
+          this.emit('elicitation-complete', {
+            serverName: server.name,
+            elicitationId,
+          });
+        }
+      }
+    );
 
     // Handle elicitation requests from server
     client.setRequestHandler(
@@ -100,14 +125,22 @@ export class MCPService extends EventEmitter {
         console.log('Server requested elicitation:', request);
 
         const requestId = `${server.name}:${Date.now()}`;
+        const params = request.params as any;
+
         const elicitRequest: ElicitationRequest = {
           serverName: server.name,
-          message: request.params.message,
-          requestedSchema: request.params.requestedSchema,
+          message: params.message,
           requestId,
+          mode: params.mode || 'form', // Default to form for backwards compatibility
+          requestedSchema: params.requestedSchema,
+          url: params.url,
+          elicitationId: params.elicitationId,
         };
 
-        // Emit event to frontend to show webview
+        // Emit event to frontend
+        // Frontend will handle differently based on mode:
+        // - form mode: show webview or auto-generated form
+        // - url mode: show consent dialog and open URL in browser
         this.emit('elicitation-request', elicitRequest);
 
         // Wait for response from frontend
@@ -119,9 +152,10 @@ export class MCPService extends EventEmitter {
         this.pendingElicitations.delete(requestId);
 
         // Return in proper MCP format
+        // For URL mode, content is omitted (user interaction happens out-of-band)
         return {
           action: response.action,
-          content: response.content,
+          content: elicitRequest.mode === 'url' ? undefined : response.content,
         };
       }
     );
