@@ -1,10 +1,13 @@
 /**
  * MCP (Model Context Protocol) Service
  * Handles connection to MCP servers and tool execution
+ * Supports elicitation and notifications
  */
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { ElicitRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import { EventEmitter } from 'events';
 
 export interface MCPServer {
   name: string;
@@ -27,9 +30,34 @@ export interface MCPToolResult {
   webviewHtml?: string;
 }
 
-export class MCPService {
+export interface ElicitationRequest {
+  serverName: string;
+  message: string;
+  requestedSchema: any;
+  requestId: string;
+}
+
+export interface ElicitationResponse {
+  action: 'accept' | 'decline' | 'cancel';
+  content?: Record<string, any>;
+}
+
+export interface MCPNotification {
+  serverName: string;
+  toolName?: string;
+  message: string;
+  type: 'info' | 'success' | 'error' | 'warning';
+  data?: any;
+}
+
+/**
+ * MCP Service with elicitation and notification support
+ */
+export class MCPService extends EventEmitter {
   private clients: Map<string, Client> = new Map();
   private servers: MCPServer[] = [];
+  private pendingElicitations: Map<string, (response: ElicitationResponse) => void> = new Map();
+  private activeOperations: Set<string> = new Set(); // Track active webviews/operations
 
   /**
    * Initialize MCP service with server configurations
@@ -47,7 +75,7 @@ export class MCPService {
   }
 
   /**
-   * Connect to an MCP server
+   * Connect to an MCP server with elicitation support
    */
   private async connectToServer(server: MCPServer): Promise<void> {
     const transport = new StdioClientTransport({
@@ -61,29 +89,39 @@ export class MCPService {
       version: '1.0.0',
     }, {
       capabilities: {
-        tools: {},
-        sampling: {}, // Enable sampling capability for proper MCP elicitation
+        elicitation: {}, // Enable elicitation capability
       },
     });
 
-    // Set up handler for sampling requests (server.createMessage() calls)
+    // Handle elicitation requests from server
     client.setRequestHandler(
-      { method: 'sampling/createMessage' } as any,
-      async (request: any) => {
-        console.log('Server requested sampling (elicitation):', request);
+      ElicitRequestSchema,
+      async (request) => {
+        console.log('Server requested elicitation:', request);
 
-        // The server is requesting user input through sampling
-        // This is where we'd integrate with the frontend to show the prompt
-        // For now, we'll pass it through as a webview elicitation
+        const requestId = `${server.name}:${Date.now()}`;
+        const elicitRequest: ElicitationRequest = {
+          serverName: server.name,
+          message: request.params.message,
+          requestedSchema: request.params.requestedSchema,
+          requestId,
+        };
 
+        // Emit event to frontend to show webview
+        this.emit('elicitation-request', elicitRequest);
+
+        // Wait for response from frontend
+        const response = await new Promise<ElicitationResponse>((resolve) => {
+          this.pendingElicitations.set(requestId, resolve);
+        });
+
+        // Clean up
+        this.pendingElicitations.delete(requestId);
+
+        // Return in proper MCP format
         return {
-          role: 'assistant',
-          content: {
-            type: 'text',
-            text: 'Elicitation via sampling not yet fully implemented. Please use webview fallback.',
-          },
-          model: 'user-input',
-          stopReason: 'endTurn',
+          action: response.action,
+          content: response.content,
         };
       }
     );
@@ -92,6 +130,44 @@ export class MCPService {
     this.clients.set(server.name, client);
 
     console.log(`Connected to MCP server: ${server.name}`);
+  }
+
+  /**
+   * Respond to an elicitation request
+   */
+  respondToElicitation(requestId: string, response: ElicitationResponse) {
+    const resolver = this.pendingElicitations.get(requestId);
+    if (resolver) {
+      resolver(response);
+    }
+  }
+
+  /**
+   * Mark an operation as active (prevents duplicate requests)
+   */
+  markOperationActive(operationId: string) {
+    this.activeOperations.add(operationId);
+  }
+
+  /**
+   * Mark an operation as complete
+   */
+  markOperationComplete(operationId: string) {
+    this.activeOperations.delete(operationId);
+  }
+
+  /**
+   * Check if an operation is active
+   */
+  isOperationActive(operationId: string): boolean {
+    return this.activeOperations.has(operationId);
+  }
+
+  /**
+   * Send a notification (unprompted message) to frontend
+   */
+  sendNotification(notification: MCPNotification) {
+    this.emit('notification', notification);
   }
 
   /**

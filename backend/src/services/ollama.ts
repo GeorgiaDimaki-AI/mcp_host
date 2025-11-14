@@ -52,7 +52,7 @@ export class OllamaService {
       if (!response.ok) {
         throw new Error(`Failed to list models: ${response.statusText}`);
       }
-      const data = await response.json();
+      const data = await response.json() as any;
       return data.models || [];
     } catch (error) {
       console.error('Error listing Ollama models:', error);
@@ -75,7 +75,7 @@ export class OllamaService {
         throw new Error(`Ollama generate failed: ${response.statusText}`);
       }
 
-      const data = await response.json();
+      const data = await response.json() as any;
       return data.response;
     } catch (error) {
       console.error('Error generating completion:', error);
@@ -149,7 +149,7 @@ export class OllamaService {
         throw new Error(`Ollama chat failed: ${response.statusText}`);
       }
 
-      const data = await response.json();
+      const data = await response.json() as any;
       return data.message.content;
     } catch (error) {
       console.error('Error in chat:', error);
