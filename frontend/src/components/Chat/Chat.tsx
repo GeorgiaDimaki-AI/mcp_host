@@ -11,6 +11,9 @@ import { mcpApi } from '../../services/mcp-api';
 import { MessageList } from '../MessageList/MessageList';
 import { ChatInput } from './ChatInput';
 import { WebviewRenderer } from '../Webview/WebviewRenderer';
+import { ElicitationDialog, ElicitationRequest } from '../Elicitation/ElicitationDialog';
+import { MCPServerSettings } from '../Settings/MCPServerSettings';
+import { ChatSummary } from './ChatSummary';
 
 const wsService = new WebSocketService('ws://localhost:3000');
 
@@ -26,6 +29,13 @@ export function Chat() {
   const [mcpWebviews, setMcpWebviews] = useState<MCPWebviewDisplay[]>([]);
   const [mcpTools, setMcpTools] = useState<MCPTool[]>([]);
   const [showMcpTools, setShowMcpTools] = useState(false);
+
+  // Elicitation state
+  const [activeElicitation, setActiveElicitation] = useState<ElicitationRequest | null>(null);
+
+  // Settings state
+  const [showSettings, setShowSettings] = useState(false);
+  const [showSummary, setShowSummary] = useState(false);
 
   // Initialize WebSocket connection
   useEffect(() => {
@@ -108,6 +118,31 @@ export function Chat() {
         addSystemMessage(`Error: ${message.error}`);
         setStreamingContent('');
         break;
+
+      case 'elicitation-request':
+        // Handle elicitation request from MCP server
+        if ((message as any).request) {
+          console.log('Received elicitation request:', (message as any).request);
+          setActiveElicitation((message as any).request);
+        }
+        break;
+
+      case 'elicitation-complete':
+        // Handle elicitation completion notification
+        if ((message as any).data) {
+          const { serverName, elicitationId } = (message as any).data;
+          addSystemMessage(`✓ ${serverName} elicitation completed (${elicitationId})`);
+        }
+        break;
+
+      case 'mcp-notification':
+        // Handle unprompted MCP notifications
+        if ((message as any).notification) {
+          const notif = (message as any).notification;
+          const icon = notif.type === 'success' ? '✅' : notif.type === 'error' ? '❌' : notif.type === 'warning' ? '⚠️' : 'ℹ️';
+          addSystemMessage(`${icon} ${notif.serverName}: ${notif.message}`);
+        }
+        break;
     }
   };
 
@@ -162,7 +197,7 @@ export function Chat() {
     const conversationMessages = [...messages, userMessage]
       .filter(msg => msg.id !== 'system-prompt-ui') // Exclude UI-only system messages
       .map(msg => ({
-        role: msg.role === 'system' ? 'system' : msg.role,
+        role: msg.role as 'user' | 'assistant' | 'system',
         content: msg.content,
       }));
 
@@ -303,6 +338,27 @@ Use webviews when it makes sense - for collecting data, showing visualizations, 
       console.error('Error calling MCP tool:', error);
       addSystemMessage(`Error calling MCP tool: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  };
+
+  // Handle elicitation response
+  const handleElicitationResponse = (response: { action: 'accept' | 'decline' | 'cancel'; content?: Record<string, any> }) => {
+    if (!activeElicitation) return;
+
+    console.log('Sending elicitation response:', response);
+
+    // Send response to backend via WebSocket
+    wsService.send({
+      type: 'elicitation-response',
+      requestId: activeElicitation.requestId,
+      response,
+    });
+
+    // Clear active elicitation
+    setActiveElicitation(null);
+
+    // Show system message
+    const actionText = response.action === 'accept' ? 'accepted' : response.action === 'decline' ? 'declined' : 'cancelled';
+    addSystemMessage(`Elicitation ${actionText} for ${activeElicitation.serverName}`);
   };
 
   // Demo functions to show webview examples
@@ -549,6 +605,30 @@ Use webviews when it makes sense - for collecting data, showing visualizations, 
                 ))}
               </select>
             )}
+
+            {/* Export Summary button */}
+            <button
+              onClick={() => setShowSummary(true)}
+              disabled={messages.length === 0}
+              className="px-3 py-2 text-gray-600 hover:text-gray-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Export Chat Summary"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+            </button>
+
+            {/* Settings button */}
+            <button
+              onClick={() => setShowSettings(true)}
+              className="px-3 py-2 text-gray-600 hover:text-gray-900 transition-colors"
+              title="MCP Server Settings"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </button>
           </div>
         </div>
       </div>
@@ -639,6 +719,27 @@ Use webviews when it makes sense - for collecting data, showing visualizations, 
             ? 'Waiting for response...'
             : 'Type a message...'
         }
+      />
+
+      {/* Elicitation Dialog */}
+      {activeElicitation && (
+        <ElicitationDialog
+          request={activeElicitation}
+          onResponse={handleElicitationResponse}
+        />
+      )}
+
+      {/* MCP Server Settings */}
+      <MCPServerSettings
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+      />
+
+      {/* Chat Summary */}
+      <ChatSummary
+        isOpen={showSummary}
+        onClose={() => setShowSummary(false)}
+        messages={messages}
       />
     </div>
   );

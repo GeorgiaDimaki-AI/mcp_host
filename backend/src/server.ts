@@ -66,6 +66,54 @@ async function initializeMCP() {
 // Initialize MCP on startup
 initializeMCP();
 
+// Track active WebSocket connections
+const activeConnections = new Set<WebSocket>();
+
+// Listen for elicitation requests from MCP service
+mcpService.on('elicitation-request', (request) => {
+  console.log('Broadcasting elicitation request to all clients:', request);
+  const message = JSON.stringify({
+    type: 'elicitation-request',
+    request,
+  });
+
+  activeConnections.forEach((ws) => {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(message);
+    }
+  });
+});
+
+// Listen for elicitation completion notifications
+mcpService.on('elicitation-complete', (data) => {
+  console.log('Broadcasting elicitation completion to all clients:', data);
+  const message = JSON.stringify({
+    type: 'elicitation-complete',
+    data,
+  });
+
+  activeConnections.forEach((ws) => {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(message);
+    }
+  });
+});
+
+// Listen for MCP notifications
+mcpService.on('notification', (notification) => {
+  console.log('Broadcasting MCP notification to all clients:', notification);
+  const message = JSON.stringify({
+    type: 'mcp-notification',
+    notification,
+  });
+
+  activeConnections.forEach((ws) => {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(message);
+    }
+  });
+});
+
 // Middleware
 app.use(cors({
   origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
@@ -100,6 +148,9 @@ app.use('/api/mcp', createMCPRouter(mcpService));
 wss.on('connection', (ws: WebSocket) => {
   console.log('Client connected');
 
+  // Track this connection
+  activeConnections.add(ws);
+
   ws.on('message', async (data: Buffer) => {
     try {
       const message = JSON.parse(data.toString());
@@ -109,6 +160,9 @@ wss.on('connection', (ws: WebSocket) => {
         await handleChatMessage(ws, message);
       } else if (message.type === 'ping') {
         ws.send(JSON.stringify({ type: 'pong' }));
+      } else if (message.type === 'elicitation-response') {
+        // Handle elicitation response from client
+        handleElicitationResponse(message);
       }
     } catch (error) {
       console.error('Error handling message:', error);
@@ -121,6 +175,7 @@ wss.on('connection', (ws: WebSocket) => {
 
   ws.on('close', () => {
     console.log('Client disconnected');
+    activeConnections.delete(ws);
   });
 
   // Send welcome message
@@ -129,6 +184,21 @@ wss.on('connection', (ws: WebSocket) => {
     message: 'Connected to LLM Webview Server',
   }));
 });
+
+/**
+ * Handle elicitation response from client
+ */
+function handleElicitationResponse(message: any) {
+  const { requestId, response } = message;
+
+  if (!requestId || !response) {
+    console.error('Invalid elicitation response:', message);
+    return;
+  }
+
+  console.log(`Responding to elicitation ${requestId}:`, response);
+  mcpService.respondToElicitation(requestId, response);
+}
 
 /**
  * Handle chat messages with streaming response

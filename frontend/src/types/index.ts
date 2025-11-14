@@ -8,6 +8,11 @@ export interface Message {
   content: string;
   timestamp: number;
   webview?: WebviewContent;
+  mcpTool?: {
+    serverName: string;
+    toolName: string;
+    args?: any;
+  };
 }
 
 export interface WebviewContent {
@@ -27,17 +32,20 @@ export interface ChatState {
 }
 
 export interface WebSocketMessage {
-  type: 'connected' | 'chat_start' | 'chat_chunk' | 'chat_complete' | 'error' | 'pong';
+  type: 'connected' | 'chat_start' | 'chat_chunk' | 'chat_complete' | 'error' | 'pong' | 'elicitation-request' | 'elicitation-complete' | 'mcp-notification';
   content?: string;
   fullContent?: string;
   message?: string;
   error?: string;
   timestamp?: number;
+  request?: any; // For elicitation-request
+  data?: any; // For elicitation-complete
+  notification?: any; // For mcp-notification
 }
 
 export interface SendMessageRequest {
-  type: 'chat' | 'ping';
-  messages: Array<{
+  type: 'chat' | 'ping' | 'elicitation-response';
+  messages?: Array<{
     role: 'user' | 'assistant' | 'system';
     content: string;
   }>;
@@ -47,6 +55,8 @@ export interface SendMessageRequest {
     top_p?: number;
     top_k?: number;
   };
+  requestId?: string; // For elicitation-response
+  response?: any; // For elicitation-response
 }
 
 export interface MCPTool {
