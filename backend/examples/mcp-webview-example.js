@@ -29,6 +29,10 @@
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import {
+  ListToolsRequestSchema,
+  CallToolRequestSchema,
+} from '@modelcontextprotocol/sdk/types.js';
 
 // In-memory storage for collected data
 const storage = {
@@ -53,7 +57,7 @@ const server = new Server(
 /**
  * List available tools
  */
-server.setRequestHandler('tools/list', async () => {
+server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
     tools: [
       {
@@ -95,7 +99,7 @@ server.setRequestHandler('tools/list', async () => {
 /**
  * Handle tool calls
  */
-server.setRequestHandler('tools/call', async (request) => {
+server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const toolName = request.params.name;
 
   switch (toolName) {

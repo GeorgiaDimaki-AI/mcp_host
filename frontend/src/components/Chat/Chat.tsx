@@ -217,6 +217,33 @@ Use webviews when it makes sense - for collecting data, showing visualizations, 
       // MCP webview - handle directly WITHOUT going through chat
       console.log('MCP webview response:', data);
 
+      // Check if this is an elicitation response (tool continuation)
+      if (data.type === 'elicitation-response' && data.formData?._continueExecution) {
+        const { _tool, _elicitationData, ...otherArgs } = data.formData;
+
+        // Remove current webview
+        setMcpWebviews(prev => prev.filter(w => w.id !== messageId));
+
+        // Show system message about continuation
+        addSystemMessage(`↻ Continuing ${_tool} with collected data...`);
+
+        // Continue tool execution with collected data
+        const continuationArgs = {
+          ...otherArgs,
+          _elicitationData,
+        };
+
+        callMCPTool(mcpWebview.serverName, _tool, continuationArgs);
+        return;
+      }
+
+      // Check if this is a cancellation
+      if (data.type === 'elicitation-cancelled') {
+        addSystemMessage(`✖ Tool execution cancelled`);
+        setMcpWebviews(prev => prev.filter(w => w.id !== messageId));
+        return;
+      }
+
       if (mcpWebview.onResponse) {
         mcpWebview.onResponse(data);
       }
