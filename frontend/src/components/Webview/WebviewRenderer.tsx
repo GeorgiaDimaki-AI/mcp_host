@@ -4,7 +4,8 @@
  */
 
 import { useEffect, useMemo } from 'react';
-import { WebviewContent } from '../../types';
+import { WebviewContent, TrustLevel } from '../../types';
+import { sanitizeHTML, getSandboxAttribute, getTrustBadge } from '../../utils/htmlSanitizer';
 
 interface WebviewRendererProps {
   content: WebviewContent;
@@ -14,6 +15,17 @@ interface WebviewRendererProps {
 export function WebviewRenderer({ content, onMessage }: WebviewRendererProps) {
   // Get parent origin for secure postMessage
   const parentOrigin = useMemo(() => window.location.origin, []);
+
+  // Determine trust level (default to unverified for safety)
+  const trustLevel: TrustLevel = content.trustLevel || 'unverified';
+
+  // Get trust badge info
+  const trustBadge = useMemo(() => getTrustBadge(trustLevel), [trustLevel]);
+
+  // Sanitize HTML based on trust level
+  const sanitizedHTML = useMemo(() => {
+    return sanitizeHTML(content.html, { trustLevel });
+  }, [content.html, trustLevel]);
 
   // Build the complete HTML document
   const htmlDocument = useMemo(() => {
@@ -74,7 +86,8 @@ export function WebviewRenderer({ content, onMessage }: WebviewRendererProps) {
     </style>
   </head>
   <body>
-    ${content.html}
+    ${sanitizedHTML}
+    ${trustLevel !== 'unverified' ? `
     <script>
       // Message passing to parent window with specific origin (security fix)
       const PARENT_ORIGIN = '${parentOrigin}';
@@ -87,9 +100,10 @@ export function WebviewRenderer({ content, onMessage }: WebviewRendererProps) {
         }, PARENT_ORIGIN);
       };
     </script>
+    ` : ''}
   </body>
 </html>`;
-  }, [content.html, parentOrigin]);
+  }, [sanitizedHTML, trustLevel, parentOrigin]);
 
   // Listen for messages from iframe with origin validation
   useEffect(() => {
@@ -111,14 +125,45 @@ export function WebviewRenderer({ content, onMessage }: WebviewRendererProps) {
   }, [onMessage]);
 
   return (
-    <iframe
-      srcDoc={htmlDocument}
-      // SECURITY: Removed 'allow-same-origin' to prevent sandbox escape
-      // See: https://developer.mozilla.org/en-US/docs/Web/HTML/Element/iframe#attr-sandbox
-      sandbox="allow-scripts allow-forms"
-      className="w-full border-0"
-      style={{ minHeight: '250px' }}
-      title="webview"
-    />
+    <div className="relative">
+      {/* Trust Badge */}
+      {content.source === 'mcp' && (
+        <div className="flex items-center justify-between mb-2 px-2 py-1 bg-gray-50 rounded-t border-b border-gray-200">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-600">
+              {content.mcpServer && `${content.mcpServer}`}
+              {content.mcpTool && ` → ${content.mcpTool}`}
+            </span>
+          </div>
+          <div className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${trustBadge.bgColor} ${trustBadge.color}`}>
+            <span>{trustBadge.icon}</span>
+            <span>{trustBadge.label}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Webview iframe */}
+      <iframe
+        srcDoc={htmlDocument}
+        // SECURITY: Trust-based sandbox configuration
+        // - Unverified: No scripts, no forms (empty sandbox)
+        // - Trusted/Verified: Scripts and forms allowed
+        // - Never use 'allow-same-origin' (prevents sandbox escape)
+        sandbox={getSandboxAttribute(trustLevel)}
+        className="w-full border-0"
+        style={{ minHeight: '250px' }}
+        title="webview"
+      />
+
+      {/* Warning for unverified MCPs */}
+      {trustLevel === 'unverified' && content.source === 'mcp' && (
+        <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
+          <strong>⚠️ Security:</strong> This MCP is unverified. Only static HTML is displayed. Scripts and forms are disabled.
+          {content.mcpServer && (
+            <span> Go to Settings to mark <strong>{content.mcpServer}</strong> as trusted.</span>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

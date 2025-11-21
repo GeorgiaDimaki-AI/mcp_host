@@ -5,11 +5,14 @@
 
 import { useState, useEffect } from 'react';
 
+export type TrustLevel = 'verified' | 'trusted' | 'unverified';
+
 export interface MCPServerConfig {
   name: string;
   command: string;
   args?: string[];
   env?: Record<string, string>;
+  trustLevel?: TrustLevel; // Default: 'unverified'
 }
 
 interface MCPServerSettingsProps {
@@ -252,11 +255,30 @@ interface ServerDisplayProps {
 }
 
 function ServerDisplay({ name, config, onEdit, onDelete }: ServerDisplayProps) {
+  // Get trust badge info
+  const trustLevel = config.trustLevel || 'unverified';
+  const getTrustBadge = () => {
+    switch (trustLevel) {
+      case 'verified':
+        return { icon: '✓', label: 'Verified', color: 'text-green-700', bg: 'bg-green-100' };
+      case 'trusted':
+        return { icon: '⚡', label: 'Trusted', color: 'text-blue-700', bg: 'bg-blue-100' };
+      default:
+        return { icon: '⚠️', label: 'Unverified', color: 'text-yellow-700', bg: 'bg-yellow-100' };
+    }
+  };
+  const badge = getTrustBadge();
+
   return (
     <div>
       <div className="flex items-start justify-between mb-3">
-        <div>
-          <h4 className="font-medium text-gray-900">{name}</h4>
+        <div className="flex-1">
+          <div className="flex items-center gap-2">
+            <h4 className="font-medium text-gray-900">{name}</h4>
+            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${badge.bg} ${badge.color}`}>
+              {badge.icon} {badge.label}
+            </span>
+          </div>
           <p className="text-sm text-gray-600 mt-1">
             <code className="bg-gray-100 px-2 py-1 rounded text-xs">
               {config.command} {config.args?.join(' ')}
@@ -395,6 +417,30 @@ function ServerForm({ server, onChange, onSave, onCancel, isNew }: ServerFormPro
           placeholder="API_KEY=your-key&#10;DEBUG=true&#10;PORT=3000"
         />
         <p className="text-xs text-gray-500 mt-1">Optional environment variables for the MCP server</p>
+      </div>
+
+      {/* Trust Level */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Trust Level
+        </label>
+        <select
+          value={server.trustLevel || 'unverified'}
+          onChange={(e) => onChange({ ...server, trustLevel: e.target.value as TrustLevel })}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="unverified">⚠️ Unverified (Static HTML only - safest)</option>
+          <option value="trusted">⚡ Trusted (Scripts and forms enabled)</option>
+          <option value="verified">✓ Verified (Full capabilities - officially verified)</option>
+        </select>
+        <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-800">
+          <p className="font-medium mb-1">Trust Level Guide:</p>
+          <ul className="space-y-1">
+            <li><strong>Unverified:</strong> HTML is sanitized, scripts removed, forms disabled. Safest option.</li>
+            <li><strong>Trusted:</strong> You explicitly trust this server. Interactive features enabled.</li>
+            <li><strong>Verified:</strong> Officially verified by maintainers. Full capabilities.</li>
+          </ul>
+        </div>
       </div>
 
       {/* Actions */}

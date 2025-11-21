@@ -15,6 +15,8 @@ export interface Message {
   };
 }
 
+export type TrustLevel = 'verified' | 'trusted' | 'unverified';
+
 export interface WebviewContent {
   type: 'html' | 'form' | 'result';
   html: string;
@@ -22,6 +24,7 @@ export interface WebviewContent {
   source?: 'chat' | 'mcp'; // Source of the webview
   mcpServer?: string; // MCP server name if source is 'mcp'
   mcpTool?: string; // MCP tool name if source is 'mcp'
+  trustLevel?: TrustLevel; // Trust level of the MCP server (default: 'unverified')
 }
 
 export interface ChatState {
