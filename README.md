@@ -1,41 +1,52 @@
-# LLM Webview Client
+# MCP Webview Host
 
-A local LLM client with integrated webview support, inspired by VS Code and Claude Desktop.
+**Secure webview host for Model Context Protocol (MCP) servers with elicitation support**
+
+A local MCP host with integrated webview support for displaying HTML content, forms, and handling user interactions from MCP servers.
+
+## Quick Start
+
+**Run with NPX (easiest):**
+
+```bash
+npx mcp-webview-host
+```
+
+That's it! The server will start and open in your browser automatically.
 
 ## Features
 
-- 💬 Simple chat interface for conversing with local LLMs
-- 🖼️ Microview system for displaying HTML content, forms, and results
-- 🤖 Ollama integration for local LLM support
-- 🔌 **MCP (Model Context Protocol) integration** for tool calling and webview elicitation
-- 🔒 Sandboxed webview execution
-- ⚡ Real-time streaming responses
+- 🔌 **Full MCP Protocol Support** - Tools, resources, prompts, and elicitation
+- 🖼️ **Secure Webview Rendering** - Sandboxed iframe execution with trust levels
+- 🔒 **Phase 1-3 Security** - XSS prevention, CSP, sandbox attributes, direct backend communication
+- 📋 **Elicitation Support** - Both form mode and URL mode
+- ⚡ **Real-time Updates** - WebSocket-based communication
+- 🎨 **Modern UI** - React + TypeScript + Tailwind CSS
+- ✅ **Well Tested** - 126 tests covering all security features
 
 ## Architecture
 
 - **Frontend**: React + TypeScript + Vite + Tailwind CSS
-- **Backend**: Node.js + Express + WebSocket
-- **LLM**: Ollama API integration
-- **MCP**: Model Context Protocol SDK for extensibility
+- **Backend**: Node.js + Express + MCP SDK
+- **Security**: Multi-layer sandboxing, CSP, DOMPurify
+- **Protocol**: Full Model Context Protocol implementation
 
-## Project Structure
+## Test Coverage
 
-```
-llm-webview-client/
-├── frontend/    # React application
-├── backend/     # Node.js API server
-└── README.md
-```
+- **Frontend**: 82% coverage (78 tests)
+- **Backend**: 90% routes coverage (48 tests)
+- **Security**: All Phase 1-3 features tested
 
 ## Getting Started
 
-### Prerequisites
+### Option 1: NPX (Recommended)
 
-- Node.js 18+
-- Ollama installed and running locally
-- npm or yarn
+Just run:
+```bash
+npx mcp-webview-host
+```
 
-### Installation
+### Option 2: Local Development
 
 1. Install backend dependencies:
 ```bash

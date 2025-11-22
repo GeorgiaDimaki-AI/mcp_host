@@ -25,7 +25,7 @@ export function sanitizeHTML(html: string, options: SanitizeOptions): string {
   }
 
   // Add hook to sanitize style attributes (remove javascript: protocol)
-  const hookId = DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+  DOMPurify.addHook('afterSanitizeAttributes', (node) => {
     if (node.hasAttribute('style')) {
       const style = node.getAttribute('style');
       if (style && style.toLowerCase().includes('javascript:')) {
