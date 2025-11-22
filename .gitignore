@@ -14,8 +14,8 @@ build/
 .env.local
 .env.*.local
 
-# MCP configuration (keep .example files)
-backend/mcp-config.json
+# MCP configuration - now committed with working example
+# backend/mcp-config.json - removed from gitignore to include working config
 
 # IDE
 .vscode/
