@@ -16,6 +16,7 @@ import { MCPServerSettings } from '../Settings/MCPServerSettings';
 import { ChatSummary } from './ChatSummary';
 import { Sidebar } from '../Sidebar/Sidebar';
 import { ModelSettings } from '../Settings/ModelSettings';
+import { ModelManager } from '../Settings/ModelManager';
 import { useMCPConfig } from '../../contexts/MCPConfigContext';
 import {
   getAllConversations,
@@ -56,6 +57,7 @@ export function Chat() {
   // Settings state
   const [showMcpSettings, setShowMcpSettings] = useState(false);
   const [showModelSettings, setShowModelSettings] = useState(false);
+  const [showModelManager, setShowModelManager] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
 
   // MCP configuration context
@@ -69,10 +71,8 @@ export function Chat() {
     // If there are conversations, select the most recent one
     if (loadedConversations.length > 0) {
       setCurrentConversationId(loadedConversations[0].id);
-    } else {
-      // Create a new conversation if none exist
-      handleCreateConversation();
     }
+    // Don't create a conversation here - wait for models to load first
   }, []);
 
   // Auto-save current conversation when messages change
@@ -111,14 +111,7 @@ export function Chat() {
       });
 
     // Load available models
-    api.getModels()
-      .then((response) => {
-        const modelNames = response.models.map(m => m.name);
-        setAvailableModels(modelNames);
-      })
-      .catch((error) => {
-        console.error('Failed to load models:', error);
-      });
+    loadModels();
 
     // Load MCP tools
     mcpApi.listTools()
@@ -136,6 +129,30 @@ export function Chat() {
       wsService.disconnect();
     };
   }, []);
+
+  // Function to load models (can be called after pulling new models)
+  const loadModels = () => {
+    api.getModels()
+      .then((response) => {
+        const modelNames = response.models.map(m => m.name);
+        setAvailableModels(modelNames);
+
+        // If no conversations exist, create one with the first available model
+        if (conversations.length === 0 && modelNames.length > 0) {
+          const newConv = createConversation(modelNames[0]);
+          setConversations([newConv]);
+          setCurrentConversationId(newConv.id);
+        }
+      })
+      .catch((error) => {
+        console.error('Failed to load models:', error);
+      });
+  };
+
+  // Reload models after pulling a new one
+  const handleModelPulled = () => {
+    loadModels();
+  };
 
   // Handle WebSocket messages
   useEffect(() => {
@@ -233,6 +250,8 @@ export function Chat() {
         type: type as 'html' | 'form' | 'result',
         html: html.trim(),
         source: 'chat' as const, // Mark as chat-generated
+        trustLevel: 'verified' as const, // Chat-generated content is verified (from LLM)
+        mcpServer: 'LLM', // Mark it as coming from LLM for badge display
       };
     }
 
@@ -560,7 +579,7 @@ Use webviews when it makes sense - for collecting data, showing visualizations, 
                 </button>
               )}
 
-              {/* Model display with settings button */}
+              {/* Model display with settings and download buttons */}
               <div className="flex items-center gap-1">
                 <span className="px-3 py-2 text-sm text-gray-700 bg-gray-50 rounded-lg border border-gray-300">
                   {currentModel}
@@ -572,6 +591,15 @@ Use webviews when it makes sense - for collecting data, showing visualizations, 
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => setShowModelManager(true)}
+                  className="px-2 py-2 text-gray-600 hover:text-gray-900 transition-colors"
+                  title="Download Models"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                   </svg>
                 </button>
               </div>
@@ -720,6 +748,13 @@ Use webviews when it makes sense - for collecting data, showing visualizations, 
           isOpen={showSummary}
           onClose={() => setShowSummary(false)}
           messages={messages}
+        />
+
+        {/* Model Manager */}
+        <ModelManager
+          isOpen={showModelManager}
+          onClose={() => setShowModelManager(false)}
+          onModelPulled={handleModelPulled}
         />
       </div>
     </div>
