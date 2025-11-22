@@ -64,6 +64,15 @@ export class MCPService extends EventEmitter {
   private pendingElicitations: Map<string, (response: ElicitationResponse) => void> = new Map();
   private activeOperations: Set<string> = new Set(); // Track active webviews/operations
 
+  // Phase 3: Direct backend communication - Request tracking for replay attack prevention
+  private activeRequests: Map<string, {
+    timestamp: number;
+    used: boolean;
+    serverName: string;
+  }> = new Map();
+
+  private REQUEST_EXPIRATION_MS = 5 * 60 * 1000; // 5 minutes
+
   /**
    * Initialize MCP service with server configurations
    */
@@ -137,6 +146,13 @@ export class MCPService extends EventEmitter {
           elicitationId: params.elicitationId,
         };
 
+        // Phase 3: Track this request for direct backend submission
+        this.activeRequests.set(requestId, {
+          timestamp: Date.now(),
+          used: false,
+          serverName: server.name,
+        });
+
         // Emit event to frontend
         // Frontend will handle differently based on mode:
         // - form mode: show webview or auto-generated form
@@ -168,12 +184,41 @@ export class MCPService extends EventEmitter {
 
   /**
    * Respond to an elicitation request
+   * Phase 3: Includes request validation to prevent replay attacks
    */
   respondToElicitation(requestId: string, response: ElicitationResponse) {
+    // Phase 3: Validate request for direct backend submission
+    const request = this.activeRequests.get(requestId);
+
+    if (!request) {
+      throw new Error('Invalid or expired request ID');
+    }
+
+    if (request.used) {
+      throw new Error('Request already used - possible replay attack');
+    }
+
+    // Check expiration (5 minutes)
+    if (Date.now() - request.timestamp > this.REQUEST_EXPIRATION_MS) {
+      this.activeRequests.delete(requestId);
+      throw new Error('Request expired');
+    }
+
+    // Mark as used to prevent replay
+    request.used = true;
+
+    // Resolve the pending elicitation
     const resolver = this.pendingElicitations.get(requestId);
     if (resolver) {
       resolver(response);
+    } else {
+      throw new Error('No pending elicitation found for this request');
     }
+
+    // Clean up after a short delay to allow MCP response to complete
+    setTimeout(() => {
+      this.activeRequests.delete(requestId);
+    }, 10000); // 10 seconds
   }
 
   /**

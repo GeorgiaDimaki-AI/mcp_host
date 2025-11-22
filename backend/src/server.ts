@@ -115,8 +115,17 @@ mcpService.on('notification', (notification) => {
 });
 
 // Middleware
+// Phase 3: Configure CORS for iframe direct submissions
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  origin: [
+    'http://localhost:5173',  // Frontend dev server
+    'http://localhost:3000',  // WebSocket server
+    'http://localhost:3001',  // API server (if different)
+    ...(process.env.CORS_ORIGIN ? [process.env.CORS_ORIGIN] : []),
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 app.use(express.json());
 

@@ -104,7 +104,10 @@ export function WebviewRenderer({ content, onMessage }: WebviewRendererProps) {
     <script>
       // Message passing to parent window with specific origin (security fix)
       const PARENT_ORIGIN = '${parentOrigin}';
+      const BACKEND_URL = '${window.location.protocol}//${window.location.hostname}:3000';
+      const REQUEST_ID = '${content.metadata?.requestId || ''}';
 
+      // Phase 2: Parent window messaging (for non-sensitive UI updates)
       window.sendToHost = function(data) {
         // Use specific origin instead of '*' to prevent external eavesdropping
         window.parent.postMessage({
@@ -112,11 +115,46 @@ export function WebviewRenderer({ content, onMessage }: WebviewRendererProps) {
           data: data
         }, PARENT_ORIGIN);
       };
+
+      // Phase 3: Direct backend submission (for sensitive data)
+      // Bypasses parent window, DevTools, and browser extensions
+      window.sendToBackend = async function(data) {
+        if (!REQUEST_ID) {
+          console.error('No request ID available for backend submission');
+          return { success: false, error: 'No request ID' };
+        }
+
+        try {
+          const response = await fetch(BACKEND_URL + '/api/mcp/elicitation-data', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              requestId: REQUEST_ID,
+              action: 'accept',
+              content: data
+            })
+          });
+
+          const result = await response.json();
+
+          if (response.ok) {
+            // Show success message
+            document.body.innerHTML = '<div style="padding: 20px; text-align: center;"><p style="color: #10b981; font-size: 16px; font-weight: 500;">✓ Submitted securely!</p><p style="color: #6b7280; font-size: 14px; margin-top: 8px;">Your data was sent directly to the backend.</p></div>';
+            return { success: true, data: result };
+          } else {
+            throw new Error(result.error || 'Submission failed');
+          }
+        } catch (error) {
+          console.error('Submission error:', error);
+          document.body.innerHTML = '<div style="padding: 20px; text-align: center;"><p style="color: #ef4444; font-size: 16px; font-weight: 500;">✗ Submission error</p><p style="color: #6b7280; font-size: 14px; margin-top: 8px;">' + (error instanceof Error ? error.message : 'Unknown error') + '</p></div>';
+          return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+        }
+      };
     </script>
     ` : ''}
   </body>
 </html>`;
-  }, [sanitizedHTML, trustLevel, parentOrigin, cspPolicy]);
+  }, [sanitizedHTML, trustLevel, parentOrigin, cspPolicy, content.metadata]);
 
   // Store onMessage callback in a ref to avoid re-registering listener
   const onMessageRef = useRef(onMessage);
