@@ -26,7 +26,7 @@ const wss = new WebSocketServer({ server });
 
 const PORT = process.env.PORT || 3000;
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
-const DEFAULT_MODEL = process.env.DEFAULT_MODEL || 'llama2';
+const DEFAULT_MODEL = process.env.DEFAULT_MODEL || 'llama3.2';
 
 // Initialize Ollama service
 const ollama = new OllamaService(OLLAMA_BASE_URL);
@@ -280,11 +280,20 @@ async function handleChatMessage(ws: WebSocket, message: any) {
 
     // Provide helpful error message for connection issues
     let errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
     if (errorMessage.includes('ECONNREFUSED') || errorMessage.includes('fetch failed')) {
       errorMessage = 'Cannot connect to Ollama. Please make sure Ollama is running:\n\n' +
                      'Install: https://ollama.com/download\n' +
                      'Start: ollama serve\n\n' +
                      'The webview features will still work without Ollama.';
+    } else if (errorMessage.includes('Not Found')) {
+      errorMessage = `Model "${model}" not found. Please install a model first:\n\n` +
+                     `Popular models:\n` +
+                     `  ollama pull llama3.2\n` +
+                     `  ollama pull qwen2.5\n` +
+                     `  ollama pull mistral\n\n` +
+                     `More models: https://ollama.com/library\n\n` +
+                     `After installing, refresh the page.`;
     }
 
     ws.send(JSON.stringify({

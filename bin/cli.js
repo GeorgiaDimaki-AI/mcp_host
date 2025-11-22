@@ -89,6 +89,32 @@ async function checkOllama() {
     if (response.ok) {
       const data = await response.json();
       log(`✓ Ollama is running (version: ${data.version || 'unknown'})`, 'green');
+
+      // Check for available models
+      try {
+        const modelsResponse = await fetch('http://localhost:11434/api/tags');
+        if (modelsResponse.ok) {
+          const modelsData = await modelsResponse.json();
+          const models = modelsData.models || [];
+
+          if (models.length === 0) {
+            log('', 'reset');
+            log('⚠️  No models installed', 'yellow');
+            log('', 'reset');
+            log('Install a model to use chat features:', 'cyan');
+            log('  ollama pull llama3.2', 'green');
+            log('  ollama pull qwen2.5', 'green');
+            log('  ollama pull mistral', 'green');
+            log('', 'reset');
+            log('More models: https://ollama.com/library', 'cyan');
+          } else {
+            log(`✓ ${models.length} model(s) available: ${models.map(m => m.name).join(', ')}`, 'green');
+          }
+        }
+      } catch (err) {
+        // Couldn't check models, continue anyway
+      }
+
       return true;
     }
   } catch (err) {
@@ -108,13 +134,16 @@ async function checkOllama() {
     log('  macOS:', 'bright');
     log('    brew install ollama', 'green');
     log('    ollama serve', 'green');
+    log('    ollama pull llama3.2', 'green');
   } else if (platform === 'linux') {
     log('  Linux:', 'bright');
     log('    curl -fsSL https://ollama.com/install.sh | sh', 'green');
     log('    ollama serve', 'green');
+    log('    ollama pull llama3.2', 'green');
   } else if (platform === 'win32') {
     log('  Windows:', 'bright');
     log('    Download from https://ollama.com/download', 'green');
+    log('    Then: ollama pull llama3.2', 'green');
   } else {
     log('  Visit: https://ollama.com/download', 'green');
   }
