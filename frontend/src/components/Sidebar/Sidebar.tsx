@@ -3,8 +3,8 @@
  * Displays conversation list with create, select, and delete actions
  */
 
-import React, { useState } from 'react';
-import { Conversation } from '../../services/conversationService';
+import React, { useState, useRef } from 'react';
+import { Conversation, exportConversations, importConversations } from '../../services/conversationService';
 
 export interface SidebarProps {
   conversations: Conversation[];
@@ -14,6 +14,7 @@ export interface SidebarProps {
   onSelectConversation: (id: string) => void;
   onCreateConversation: () => void;
   onDeleteConversation: (id: string) => void;
+  onConversationsImported?: () => void; // Callback to refresh after import
 }
 
 export function Sidebar({
@@ -24,8 +25,11 @@ export function Sidebar({
   onSelectConversation,
   onCreateConversation,
   onDeleteConversation,
+  onConversationsImported,
 }: SidebarProps) {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [showMenu, setShowMenu] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDelete = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -57,6 +61,56 @@ export function Sidebar({
       month: 'short',
       day: 'numeric',
     });
+  };
+
+  const handleExport = () => {
+    try {
+      const json = exportConversations();
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `conversations-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setShowMenu(false);
+    } catch (error) {
+      console.error('Export failed:', error);
+      alert('Failed to export conversations');
+    }
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+    setShowMenu(false);
+  };
+
+  const handleImportFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const json = e.target?.result as string;
+        const count = importConversations(json);
+        alert(`Successfully imported ${count} conversation(s)`);
+        if (onConversationsImported) {
+          onConversationsImported();
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to import';
+        alert('Import failed: ' + message);
+      }
+    };
+    reader.readAsText(file);
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   if (isCollapsed) {
@@ -262,11 +316,73 @@ export function Sidebar({
         )}
       </div>
 
-      {/* Footer Info */}
+      {/* Footer with Export/Import */}
       <div className="p-3 border-t border-gray-200 bg-gray-50">
-        <p className="text-xs text-gray-500 text-center">
-          {conversations.length} conversation{conversations.length !== 1 ? 's' : ''}
-        </p>
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-gray-500">
+            {conversations.length} conversation{conversations.length !== 1 ? 's' : ''}
+          </p>
+          <div className="relative">
+            <button
+              onClick={() => setShowMenu(!showMenu)}
+              className="p-1 hover:bg-gray-200 rounded transition-colors"
+              title="Manage conversations"
+              aria-label="Manage conversations"
+            >
+              <svg
+                className="w-4 h-4 text-gray-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"
+                />
+              </svg>
+            </button>
+
+            {/* Dropdown Menu */}
+            {showMenu && (
+              <div className="absolute bottom-full right-0 mb-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+                <button
+                  onClick={handleExport}
+                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 rounded-t-lg transition-colors flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  Export Conversations
+                </button>
+                <button
+                  onClick={handleImportClick}
+                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 rounded-b-lg transition-colors flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                  </svg>
+                  Import Conversations
+                </button>
+                <div className="px-4 py-2 border-t border-gray-200">
+                  <p className="text-xs text-gray-500">
+                    Data is stored in your browser's localStorage
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Hidden file input for import */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="application/json"
+          onChange={handleImportFile}
+          className="hidden"
+        />
       </div>
     </div>
   );

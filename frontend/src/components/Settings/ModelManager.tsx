@@ -9,6 +9,7 @@ export interface ModelManagerProps {
   isOpen: boolean;
   onClose: () => void;
   onModelPulled: () => void; // Callback to refresh model list
+  installedModels: string[]; // List of already installed models
 }
 
 interface PopularModel {
@@ -27,7 +28,7 @@ const POPULAR_MODELS: PopularModel[] = [
   { name: 'gemma2', description: 'Google Gemma 2 (2B)', size: '~1.6GB' },
 ];
 
-export function ModelManager({ isOpen, onClose, onModelPulled }: ModelManagerProps) {
+export function ModelManager({ isOpen, onClose, onModelPulled, installedModels }: ModelManagerProps) {
   const [pulling, setPulling] = useState<string | null>(null);
   const [progress, setProgress] = useState<{ status: string; percent?: number }>({ status: '' });
   const [customModel, setCustomModel] = useState('');
@@ -214,29 +215,56 @@ export function ModelManager({ isOpen, onClose, onModelPulled }: ModelManagerPro
           <div>
             <h3 className="text-sm font-medium text-gray-900 mb-3">Popular Models</h3>
             <div className="grid gap-3">
-              {POPULAR_MODELS.map((model) => (
-                <div
-                  key={model.name}
-                  className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:border-blue-300 transition-colors"
-                >
-                  <div className="flex-1">
-                    <h4 className="text-sm font-medium text-gray-900">{model.name}</h4>
-                    <p className="text-xs text-gray-600 mt-0.5">{model.description}</p>
-                    <p className="text-xs text-gray-500 mt-1">Size: {model.size}</p>
-                  </div>
-                  <button
-                    onClick={() => pullModel(model.name)}
-                    disabled={pulling !== null}
-                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                      pulling === model.name
-                        ? 'bg-blue-100 text-blue-700'
-                        : 'bg-blue-500 text-white hover:bg-blue-600 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed'
+              {POPULAR_MODELS.map((model) => {
+                const isInstalled = installedModels.some(
+                  (installed) =>
+                    installed === model.name ||
+                    installed.startsWith(model.name + ':')
+                );
+
+                return (
+                  <div
+                    key={model.name}
+                    className={`flex items-center justify-between p-3 border rounded-lg transition-colors ${
+                      isInstalled
+                        ? 'border-green-300 bg-green-50'
+                        : 'border-gray-200 hover:border-blue-300'
                     }`}
                   >
-                    {pulling === model.name ? 'Downloading...' : 'Download'}
-                  </button>
-                </div>
-              ))}
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <h4 className={`text-sm font-medium ${isInstalled ? 'text-green-900' : 'text-gray-900'}`}>
+                          {model.name}
+                        </h4>
+                        {isInstalled && (
+                          <span className="px-2 py-0.5 text-xs font-medium bg-green-200 text-green-800 rounded">
+                            ✓ Installed
+                          </span>
+                        )}
+                      </div>
+                      <p className={`text-xs mt-0.5 ${isInstalled ? 'text-green-700' : 'text-gray-600'}`}>
+                        {model.description}
+                      </p>
+                      <p className={`text-xs mt-1 ${isInstalled ? 'text-green-600' : 'text-gray-500'}`}>
+                        Size: {model.size}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => pullModel(model.name)}
+                      disabled={pulling !== null || isInstalled}
+                      className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                        pulling === model.name
+                          ? 'bg-blue-100 text-blue-700'
+                          : isInstalled
+                          ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                          : 'bg-blue-500 text-white hover:bg-blue-600 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed'
+                      }`}
+                    >
+                      {pulling === model.name ? 'Downloading...' : isInstalled ? 'Installed' : 'Download'}
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           </div>
 

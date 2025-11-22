@@ -3,7 +3,7 @@
  * Main chat interface container with MCP webview support and conversation management
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Message, WebSocketMessage, MCPWebviewDisplay, MCPTool } from '../../types';
 import { WebSocketService } from '../../services/websocket';
 import { api } from '../../services/api';
@@ -34,6 +34,9 @@ export function Chat() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // Track previous conversation to prevent cross-contamination when switching
+  const previousConversationIdRef = useRef<string | null>(null);
 
   // Current conversation derived state
   const currentConversation = conversations.find(c => c.id === currentConversationId) || null;
@@ -77,8 +80,19 @@ export function Chat() {
 
   // Auto-save current conversation when messages change
   useEffect(() => {
-    if (!currentConversationId || messages.length === 0) return;
+    // Skip if no conversation selected or empty messages
+    if (!currentConversationId || messages.length === 0) {
+      previousConversationIdRef.current = currentConversationId;
+      return;
+    }
 
+    // Skip auto-save immediately after switching conversations to prevent cross-contamination
+    if (previousConversationIdRef.current !== currentConversationId) {
+      previousConversationIdRef.current = currentConversationId;
+      return;
+    }
+
+    // Only auto-save when actually in the same conversation
     const updated = updateConversation(currentConversationId, {
       messages,
       model: currentModel,
@@ -90,7 +104,9 @@ export function Chat() {
         prev.map(c => (c.id === currentConversationId ? updated : c))
       );
     }
-  }, [messages]);
+
+    previousConversationIdRef.current = currentConversationId;
+  }, [messages, currentConversationId, currentModel, modelSettings]);
 
   // Handle settings close - reload MCP config in case it was updated
   const handleMcpSettingsClose = () => {
@@ -518,6 +534,19 @@ Use webviews when it makes sense - for collecting data, showing visualizations, 
     }
   };
 
+  const handleConversationsImported = () => {
+    // Reload conversations from localStorage after import
+    const loadedConversations = getAllConversations();
+    setConversations(loadedConversations);
+
+    // If no conversation is selected or current one is gone, select the first one
+    if (!currentConversationId || !loadedConversations.find(c => c.id === currentConversationId)) {
+      if (loadedConversations.length > 0) {
+        setCurrentConversationId(loadedConversations[0].id);
+      }
+    }
+  };
+
   return (
     <div className="flex h-screen bg-gray-50">
       {/* Sidebar */}
@@ -529,6 +558,7 @@ Use webviews when it makes sense - for collecting data, showing visualizations, 
         onSelectConversation={handleSelectConversation}
         onCreateConversation={handleCreateConversation}
         onDeleteConversation={handleDeleteConversation}
+        onConversationsImported={handleConversationsImported}
       />
 
       {/* Main Chat Area */}
@@ -579,11 +609,36 @@ Use webviews when it makes sense - for collecting data, showing visualizations, 
                 </button>
               )}
 
-              {/* Model display with settings and download buttons */}
+              {/* Model selector with settings button */}
               <div className="flex items-center gap-1">
-                <span className="px-3 py-2 text-sm text-gray-700 bg-gray-50 rounded-lg border border-gray-300">
-                  {currentModel}
-                </span>
+                <div className="relative">
+                  <select
+                    value={currentModel}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === '__download__') {
+                        setShowModelManager(true);
+                      } else {
+                        handleSaveModelSettings(value, modelSettings);
+                      }
+                    }}
+                    className="appearance-none px-3 py-2 pr-8 text-sm text-gray-700 bg-gray-50 rounded-lg border border-gray-300 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                  >
+                    {availableModels.map((model) => (
+                      <option key={model} value={model}>
+                        {model}
+                      </option>
+                    ))}
+                    <option value="__download__" className="text-blue-600 font-medium">
+                      ⬇ Download more models...
+                    </option>
+                  </select>
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none">
+                    <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
                 <button
                   onClick={() => setShowModelSettings(true)}
                   className="px-2 py-2 text-gray-600 hover:text-gray-900 transition-colors"
@@ -591,15 +646,6 @@ Use webviews when it makes sense - for collecting data, showing visualizations, 
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-                  </svg>
-                </button>
-                <button
-                  onClick={() => setShowModelManager(true)}
-                  className="px-2 py-2 text-gray-600 hover:text-gray-900 transition-colors"
-                  title="Download Models"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                   </svg>
                 </button>
               </div>
@@ -616,16 +662,16 @@ Use webviews when it makes sense - for collecting data, showing visualizations, 
                 </svg>
               </button>
 
-              {/* MCP Settings button */}
+              {/* MCP Server Configuration button */}
               <button
                 onClick={() => setShowMcpSettings(true)}
-                className="px-3 py-2 text-gray-600 hover:text-gray-900 transition-colors"
-                title="MCP Server Settings"
+                className="px-3 py-2 text-gray-600 hover:text-gray-900 transition-colors flex items-center gap-1"
+                title="MCP Server Configuration"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
                 </svg>
+                <span className="text-xs font-medium hidden xl:inline">MCP</span>
               </button>
             </div>
           </div>
@@ -755,6 +801,7 @@ Use webviews when it makes sense - for collecting data, showing visualizations, 
           isOpen={showModelManager}
           onClose={() => setShowModelManager(false)}
           onModelPulled={handleModelPulled}
+          installedModels={availableModels}
         />
       </div>
     </div>
