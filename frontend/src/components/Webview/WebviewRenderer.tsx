@@ -3,7 +3,7 @@
  * Renders HTML content in a sandboxed iframe
  */
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { WebviewContent, TrustLevel } from '../../types';
 import { sanitizeHTML, getSandboxAttribute, getTrustBadge } from '../../utils/htmlSanitizer';
 
@@ -27,6 +27,19 @@ export function WebviewRenderer({ content, onMessage }: WebviewRendererProps) {
     return sanitizeHTML(content.html, { trustLevel });
   }, [content.html, trustLevel]);
 
+  // Get CSP based on trust level
+  const cspPolicy = useMemo(() => {
+    const basePolicy = "default-src 'none'; style-src 'unsafe-inline'; img-src https: data:; font-src data:;";
+
+    if (trustLevel === 'unverified') {
+      // Unverified: No scripts, no forms, no network connections
+      return basePolicy;
+    } else {
+      // Trusted/Verified: Allow inline scripts (needed for sendToHost) and forms
+      return basePolicy + " script-src 'unsafe-inline'; connect-src http://localhost:*; form-action 'self';";
+    }
+  }, [trustLevel]);
+
   // Build the complete HTML document
   const htmlDocument = useMemo(() => {
     return `<!DOCTYPE html>
@@ -35,7 +48,7 @@ export function WebviewRenderer({ content, onMessage }: WebviewRendererProps) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- Content Security Policy for iframe security -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src https: data:; font-src data:; connect-src http://localhost:*; form-action 'self';">
+    <meta http-equiv="Content-Security-Policy" content="${cspPolicy}">
     <style>
       * {
         margin: 0;
@@ -91,7 +104,10 @@ export function WebviewRenderer({ content, onMessage }: WebviewRendererProps) {
     <script>
       // Message passing to parent window with specific origin (security fix)
       const PARENT_ORIGIN = '${parentOrigin}';
+      const BACKEND_URL = '${window.location.protocol}//${window.location.hostname}:3000';
+      const REQUEST_ID = '${content.metadata?.requestId || ''}';
 
+      // Phase 2: Parent window messaging (for non-sensitive UI updates)
       window.sendToHost = function(data) {
         // Use specific origin instead of '*' to prevent external eavesdropping
         window.parent.postMessage({
@@ -99,13 +115,55 @@ export function WebviewRenderer({ content, onMessage }: WebviewRendererProps) {
           data: data
         }, PARENT_ORIGIN);
       };
+
+      // Phase 3: Direct backend submission (for sensitive data)
+      // Bypasses parent window, DevTools, and browser extensions
+      window.sendToBackend = async function(data) {
+        if (!REQUEST_ID) {
+          console.error('No request ID available for backend submission');
+          return { success: false, error: 'No request ID' };
+        }
+
+        try {
+          const response = await fetch(BACKEND_URL + '/api/mcp/elicitation-data', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              requestId: REQUEST_ID,
+              action: 'accept',
+              content: data
+            })
+          });
+
+          const result = await response.json();
+
+          if (response.ok) {
+            // Show success message
+            document.body.innerHTML = '<div style="padding: 20px; text-align: center;"><p style="color: #10b981; font-size: 16px; font-weight: 500;">✓ Submitted securely!</p><p style="color: #6b7280; font-size: 14px; margin-top: 8px;">Your data was sent directly to the backend.</p></div>';
+            return { success: true, data: result };
+          } else {
+            throw new Error(result.error || 'Submission failed');
+          }
+        } catch (error) {
+          console.error('Submission error:', error);
+          document.body.innerHTML = '<div style="padding: 20px; text-align: center;"><p style="color: #ef4444; font-size: 16px; font-weight: 500;">✗ Submission error</p><p style="color: #6b7280; font-size: 14px; margin-top: 8px;">' + (error instanceof Error ? error.message : 'Unknown error') + '</p></div>';
+          return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+        }
+      };
     </script>
     ` : ''}
   </body>
 </html>`;
-  }, [sanitizedHTML, trustLevel, parentOrigin]);
+  }, [sanitizedHTML, trustLevel, parentOrigin, cspPolicy, content.metadata]);
+
+  // Store onMessage callback in a ref to avoid re-registering listener
+  const onMessageRef = useRef(onMessage);
+  useEffect(() => {
+    onMessageRef.current = onMessage;
+  }, [onMessage]);
 
   // Listen for messages from iframe with origin validation
+  // Using ref to avoid memory leak from frequent listener re-registration
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       // SECURITY: Validate message origin to prevent external eavesdropping
@@ -115,14 +173,14 @@ export function WebviewRenderer({ content, onMessage }: WebviewRendererProps) {
       }
 
       // Process valid messages
-      if (event.data?.type === 'webview-message' && onMessage) {
-        onMessage(event.data.data);
+      if (event.data?.type === 'webview-message' && onMessageRef.current) {
+        onMessageRef.current(event.data.data);
       }
     };
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [onMessage]);
+  }, []); // Empty deps - listener registered once and uses ref for latest callback
 
   return (
     <div className="relative">

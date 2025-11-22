@@ -599,7 +599,8 @@ npm run dev
 - [MCP SDK Documentation](https://github.com/modelcontextprotocol/sdk)
 - [Webview Guide](./WEBVIEW_GUIDE.md)
 - [MCP Integration Guide](./MCP_GUIDE.md)
-- [Example Server](./examples/mcp-webview-example.js)
+- [Example Server](../examples/mcp-webview-example.js)
+- [Phase 3: Direct Backend Communication Guide](./Phase_3_Direct_Backend_Communication_Guide.md) - **New! Secure sensitive data submission**
 
 ---
 

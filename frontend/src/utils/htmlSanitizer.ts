@@ -1,8 +1,9 @@
 /**
  * HTML Sanitizer for Untrusted MCP Content
- * Strips dangerous elements to create static HTML
+ * Uses DOMPurify for robust sanitization against XSS attacks
  */
 
+import DOMPurify from 'dompurify';
 import { TrustLevel } from '../types';
 
 export interface SanitizeOptions {
@@ -13,7 +14,7 @@ export interface SanitizeOptions {
 /**
  * Sanitize HTML based on trust level
  * - verified/trusted: Allow everything (no sanitization)
- * - unverified: Strip scripts, event handlers, and disable forms
+ * - unverified: Use DOMPurify to strip dangerous content
  */
 export function sanitizeHTML(html: string, options: SanitizeOptions): string {
   const { trustLevel, allowForms = false } = options;
@@ -23,44 +24,70 @@ export function sanitizeHTML(html: string, options: SanitizeOptions): string {
     return html;
   }
 
-  // Unverified MCPs: enforce static HTML
-  let sanitized = html;
-
-  // 1. Remove all <script> tags and their content
-  sanitized = sanitized.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
-
-  // 2. Remove inline event handlers (onclick, onload, onerror, etc.)
-  sanitized = sanitized.replace(/\s+on\w+\s*=\s*["'][^"']*["']/gi, '');
-  sanitized = sanitized.replace(/\s+on\w+\s*=\s*[^\s>]*/gi, '');
-
-  // 3. Remove javascript: protocol in links and attributes
-  sanitized = sanitized.replace(/javascript:/gi, 'blocked:');
-
-  // 4. Disable forms if not allowed
-  if (!allowForms) {
-    // Make all inputs readonly
-    sanitized = sanitized.replace(/<input/gi, '<input readonly disabled');
-    sanitized = sanitized.replace(/<textarea/gi, '<textarea readonly disabled');
-    sanitized = sanitized.replace(/<select/gi, '<select disabled');
-
-    // Disable form submission
-    sanitized = sanitized.replace(/<form/gi, '<form onsubmit="return false"');
-
-    // Disable buttons
-    sanitized = sanitized.replace(/<button/gi, '<button disabled');
-  }
-
-  // 5. Remove potentially dangerous tags
-  const dangerousTags = ['iframe', 'embed', 'object', 'applet', 'link'];
-  dangerousTags.forEach(tag => {
-    const regex = new RegExp(`<${tag}\\b[^<]*(?:(?!<\\/${tag}>)<[^<]*)*<\\/${tag}>`, 'gi');
-    sanitized = sanitized.replace(regex, '');
-    // Also remove self-closing versions
-    const selfClosingRegex = new RegExp(`<${tag}\\b[^>]*\\/?>`, 'gi');
-    sanitized = sanitized.replace(selfClosingRegex, '');
+  // Add hook to sanitize style attributes (remove javascript: protocol)
+  DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+    if (node.hasAttribute('style')) {
+      const style = node.getAttribute('style');
+      if (style && style.toLowerCase().includes('javascript:')) {
+        node.removeAttribute('style');
+      }
+    }
   });
 
-  return sanitized;
+  // Unverified MCPs: enforce static HTML with DOMPurify
+  const config = {
+    // Allow only safe display tags
+    ALLOWED_TAGS: [
+      'div', 'span', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+      'table', 'thead', 'tbody', 'tr', 'td', 'th',
+      'ul', 'ol', 'li',
+      'br', 'hr',
+      'strong', 'em', 'b', 'i', 'u',
+      'code', 'pre',
+      'a', 'img',
+    ],
+
+    // Very limited attributes for styling only
+    ALLOWED_ATTR: ['class', 'style', 'href', 'src', 'alt', 'title'],
+
+    // Block all dangerous tags
+    FORBID_TAGS: ['script', 'iframe', 'embed', 'object', 'applet', 'link',
+                  'base', 'meta', 'style', 'form', 'input', 'button',
+                  'textarea', 'select', 'option'],
+
+    // Block all event handlers
+    FORBID_ATTR: ['onclick', 'onload', 'onerror', 'onmouseover', 'onmouseout',
+                  'onfocus', 'onblur', 'onchange', 'onsubmit', 'oninput'],
+
+    // Don't allow data attributes (can be used for XSS)
+    ALLOW_DATA_ATTR: false,
+
+    // Allowed protocols for links and images
+    ALLOWED_URI_REGEXP: /^(?:(?:(?:f|ht)tps?|mailto):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
+
+    // Safer defaults
+    SAFE_FOR_TEMPLATES: true,
+  };
+
+  // Additional config for forms if needed
+  if (allowForms) {
+    config.ALLOWED_TAGS?.push('form', 'input', 'button', 'textarea', 'select', 'option', 'label');
+    config.ALLOWED_ATTR?.push('type', 'name', 'value', 'placeholder', 'required', 'disabled', 'readonly');
+
+    // Remove form tags from forbidden list
+    config.FORBID_TAGS = config.FORBID_TAGS?.filter(tag =>
+      !['form', 'input', 'button', 'textarea', 'select', 'option'].includes(tag)
+    );
+  }
+
+  // Sanitize with DOMPurify (returns string when RETURN_DOM is false, which is default)
+  // DOMPurify will remove all forbidden tags and attributes based on config
+  const result = DOMPurify.sanitize(html, config) as string;
+
+  // Remove the hook after sanitization
+  DOMPurify.removeHook('afterSanitizeAttributes');
+
+  return result;
 }
 
 /**

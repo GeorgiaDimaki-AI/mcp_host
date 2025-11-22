@@ -183,7 +183,7 @@ function FormModeDialog({
         <form onSubmit={handleSubmit} className="space-y-4">
           {Object.entries(schema.properties).map(([key, fieldSchema]: [string, any]) => (
             <div key={key}>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor={`field-${key}`} className="block text-sm font-medium text-gray-700 mb-1">
                 {fieldSchema.title || key}
                 {schema.required?.includes(key) && <span className="text-red-500 ml-1">*</span>}
               </label>
@@ -240,6 +240,7 @@ function renderFormField(
   if (fieldSchema.enum) {
     return (
       <select
+        id={`field-${key}`}
         value={value || ''}
         onChange={(e) => onChange(key, e.target.value)}
         required={required}
@@ -259,6 +260,7 @@ function renderFormField(
   if (fieldSchema.oneOf) {
     return (
       <select
+        id={`field-${key}`}
         value={value || ''}
         onChange={(e) => onChange(key, e.target.value)}
         required={required}
@@ -278,6 +280,7 @@ function renderFormField(
   if (fieldSchema.type === 'boolean') {
     return (
       <input
+        id={`field-${key}`}
         type="checkbox"
         checked={value || false}
         onChange={(e) => onChange(key, e.target.checked)}
@@ -290,6 +293,7 @@ function renderFormField(
   if (fieldSchema.type === 'number' || fieldSchema.type === 'integer') {
     return (
       <input
+        id={`field-${key}`}
         type="number"
         value={value || ''}
         onChange={(e) => onChange(key, fieldSchema.type === 'integer' ? parseInt(e.target.value, 10) : parseFloat(e.target.value))}
@@ -307,6 +311,7 @@ function renderFormField(
     if (fieldSchema.format === 'email') {
       return (
         <input
+          id={`field-${key}`}
           type="email"
           value={value || ''}
           onChange={(e) => onChange(key, e.target.value)}
@@ -321,6 +326,7 @@ function renderFormField(
     if (fieldSchema.format === 'uri') {
       return (
         <input
+          id={`field-${key}`}
           type="url"
           value={value || ''}
           onChange={(e) => onChange(key, e.target.value)}
@@ -335,6 +341,7 @@ function renderFormField(
     if (fieldSchema.format === 'date') {
       return (
         <input
+          id={`field-${key}`}
           type="date"
           value={value || ''}
           onChange={(e) => onChange(key, e.target.value)}
@@ -347,6 +354,7 @@ function renderFormField(
     if (fieldSchema.format === 'date-time') {
       return (
         <input
+          id={`field-${key}`}
           type="datetime-local"
           value={value || ''}
           onChange={(e) => onChange(key, e.target.value)}
@@ -356,9 +364,25 @@ function renderFormField(
       );
     }
 
+    if (fieldSchema.format === 'password') {
+      return (
+        <input
+          id={`field-${key}`}
+          type="password"
+          value={value || ''}
+          onChange={(e) => onChange(key, e.target.value)}
+          required={required}
+          minLength={fieldSchema.minLength}
+          maxLength={fieldSchema.maxLength}
+          className={baseClasses}
+        />
+      );
+    }
+
     // Default string input
     return (
       <input
+        id={`field-${key}`}
         type="text"
         value={value || ''}
         onChange={(e) => onChange(key, e.target.value)}
@@ -374,6 +398,7 @@ function renderFormField(
   // Fallback
   return (
     <input
+      id={`field-${key}`}
       type="text"
       value={value || ''}
       onChange={(e) => onChange(key, e.target.value)}

@@ -3,10 +3,15 @@
  */
 
 import { Chat } from './components/Chat/Chat';
+import { MCPConfigProvider } from './contexts/MCPConfigContext';
 import './index.css';
 
 function App() {
-  return <Chat />;
+  return (
+    <MCPConfigProvider>
+      <Chat />
+    </MCPConfigProvider>
+  );
 }
 
 export default App;

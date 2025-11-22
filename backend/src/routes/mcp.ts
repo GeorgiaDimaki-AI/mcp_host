@@ -79,6 +79,61 @@ export function createMCPRouter(mcpService: MCPService) {
   });
 
   /**
+   * Phase 3: Direct elicitation data submission
+   * Allows iframe to submit form data directly to backend, bypassing parent window
+   * This prevents parent window JavaScript, DevTools, and extensions from seeing sensitive data
+   */
+  router.post('/elicitation-data', async (req, res) => {
+    try {
+      const { requestId, action, content } = req.body;
+
+      // Validate required fields
+      if (!requestId || !action) {
+        return res.status(400).json({
+          error: 'requestId and action are required',
+        });
+      }
+
+      // Validate action
+      if (!['accept', 'decline', 'cancel'].includes(action)) {
+        return res.status(400).json({
+          error: 'Invalid action. Must be: accept, decline, or cancel',
+        });
+      }
+
+      // Validate content for accept action
+      if (action === 'accept' && !content) {
+        return res.status(400).json({
+          error: 'content is required when action is accept',
+        });
+      }
+
+      // Submit to MCP service (includes request validation)
+      mcpService.respondToElicitation(requestId, {
+        action,
+        content: action === 'accept' ? content : undefined,
+      });
+
+      res.json({
+        success: true,
+        message: 'Elicitation response submitted successfully',
+      });
+    } catch (error) {
+      console.error('Error submitting elicitation data:', error);
+
+      // Return appropriate error message
+      const errorMessage = error instanceof Error ? error.message : 'Failed to submit elicitation data';
+      const statusCode = errorMessage.includes('expired') ||
+                         errorMessage.includes('Invalid') ||
+                         errorMessage.includes('already used') ? 400 : 500;
+
+      res.status(statusCode).json({
+        error: errorMessage,
+      });
+    }
+  });
+
+  /**
    * Update MCP configuration
    */
   router.put('/config', (req, res) => {
