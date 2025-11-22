@@ -42,31 +42,49 @@ let mcpInitialized = false;
 // Load MCP configuration
 async function initializeMCP() {
   try {
-    const configPath = './mcp-config.json';
+    // Try multiple paths for mcp-config.json to handle both dev and production
+    const possiblePaths = [
+      './mcp-config.json',                    // When run from backend/ directory
+      join(__dirname, '../mcp-config.json'),  // Relative to compiled dist folder
+      join(__dirname, '../../mcp-config.json'),// Two levels up from dist
+    ];
 
-    if (existsSync(configPath)) {
-      const configData = readFileSync(configPath, 'utf-8');
-      const config = JSON.parse(configData);
-
-      if (config.mcpServers && Object.keys(config.mcpServers).length > 0) {
-        const servers: MCPServer[] = Object.entries(config.mcpServers).map(
-          ([name, serverConfig]: [string, any]) => ({
-            name,
-            command: serverConfig.command,
-            args: serverConfig.args,
-            env: serverConfig.env,
-          })
-        );
-
-        await mcpService.initialize(servers);
-        mcpInitialized = true;
-        console.log(`✅ MCP initialized with ${servers.length} server(s)`);
-      } else {
-        console.log('No MCP servers configured in mcp-config.json');
+    let configPath: string | null = null;
+    for (const path of possiblePaths) {
+      if (existsSync(path)) {
+        configPath = path;
+        console.log(`Found MCP config at: ${path}`);
+        break;
       }
-    } else {
-      console.log('⚠️  No MCP configuration file found at ./mcp-config.json');
+    }
+
+    if (!configPath) {
+      console.log('⚠️  No MCP configuration file found');
+      console.log('   Searched paths:', possiblePaths);
+      console.log('   Current directory:', process.cwd());
+      console.log('   __dirname:', __dirname);
       console.log('   MCP servers will not be available');
+      return;
+    }
+
+    const configData = readFileSync(configPath, 'utf-8');
+    const config = JSON.parse(configData);
+
+    if (config.mcpServers && Object.keys(config.mcpServers).length > 0) {
+      const servers: MCPServer[] = Object.entries(config.mcpServers).map(
+        ([name, serverConfig]: [string, any]) => ({
+          name,
+          command: serverConfig.command,
+          args: serverConfig.args,
+          env: serverConfig.env,
+        })
+      );
+
+      await mcpService.initialize(servers);
+      mcpInitialized = true;
+      console.log(`✅ MCP initialized with ${servers.length} server(s)`);
+    } else {
+      console.log('No MCP servers configured in mcp-config.json');
     }
   } catch (error) {
     console.error('❌ Error initializing MCP:', error);
@@ -271,10 +289,28 @@ function handleElicitationResponse(message: any) {
 }
 
 /**
- * Handle chat messages with streaming response
+ * Convert MCP tools to Ollama function format
+ */
+function convertMCPToolsToOllamaFormat(mcpTools: any[]): any[] {
+  return mcpTools.map(tool => ({
+    type: 'function',
+    function: {
+      name: `${tool.serverName}_${tool.name}`,
+      description: tool.description || `${tool.name} from ${tool.serverName}`,
+      parameters: tool.inputSchema || {
+        type: 'object',
+        properties: {},
+        required: [],
+      },
+    },
+  }));
+}
+
+/**
+ * Handle chat messages with streaming response and MCP tool integration
  */
 async function handleChatMessage(ws: WebSocket, message: any) {
-  const { messages, model = DEFAULT_MODEL, options = {} } = message;
+  const { messages, model = DEFAULT_MODEL, options = {}, mcpServer } = message;
 
   try {
     // Send start signal
@@ -289,12 +325,29 @@ async function handleChatMessage(ws: WebSocket, message: any) {
       content: msg.content,
     }));
 
+    // Get MCP tools if a server is selected
+    let tools: any[] | undefined = undefined;
+    if (mcpServer && mcpInitialized) {
+      try {
+        const mcpTools = await mcpService.listTools();
+        const serverTools = mcpTools.filter(t => t.serverName === mcpServer);
+
+        if (serverTools.length > 0) {
+          tools = convertMCPToolsToOllamaFormat(serverTools);
+          console.log(`📦 Providing ${tools.length} tools to LLM from ${mcpServer}`);
+        }
+      } catch (error) {
+        console.error('Error loading MCP tools:', error);
+      }
+    }
+
     // Stream the response
     let fullResponse = '';
     for await (const chunk of ollama.chatStream({
       model,
       messages: ollamaMessages,
       stream: true,
+      tools,
       options,
     })) {
       fullResponse += chunk;

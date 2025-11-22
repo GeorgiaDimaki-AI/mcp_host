@@ -53,6 +53,7 @@ export interface SendMessageRequest {
     content: string;
   }>;
   model?: string;
+  mcpServer?: string; // Selected MCP server for tool calling
   options?: {
     temperature?: number;
     top_p?: number;

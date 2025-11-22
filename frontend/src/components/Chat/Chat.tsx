@@ -400,9 +400,10 @@ ALWAYS with triple backticks and webview:type!`;
       type: 'chat',
       messages: [systemPrompt, ...conversationMessages],
       model: currentModel,
+      mcpServer: currentMcpServer, // Send selected MCP server to enable tool calling
       options: modelSettings,
     });
-  }, [messages, currentModel, modelSettings, currentConversationId]);
+  }, [messages, currentModel, modelSettings, currentMcpServer, currentConversationId]);
 
   const handleWebviewMessage = (messageId: string, data: any) => {
     console.log('Webview message from', messageId, ':', data);
