@@ -155,6 +155,37 @@ app.get('/api/models', async (req, res) => {
   }
 });
 
+// Pull/download a model (Server-Sent Events for progress)
+app.post('/api/models/pull', async (req, res) => {
+  try {
+    const { name } = req.body;
+
+    if (!name) {
+      return res.status(400).json({ error: 'Model name is required' });
+    }
+
+    console.log(`Starting model pull: ${name}`);
+
+    // Set up Server-Sent Events
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    // Send progress updates
+    for await (const progress of ollama.pullModel(name)) {
+      res.write(`data: ${JSON.stringify(progress)}\n\n`);
+    }
+
+    // End the stream
+    res.write(`data: ${JSON.stringify({ status: 'success', done: true })}\n\n`);
+    res.end();
+  } catch (error: any) {
+    console.error('Error pulling model:', error);
+    res.write(`data: ${JSON.stringify({ status: 'error', error: error.message || 'Unknown error' })}\n\n`);
+    res.end();
+  }
+});
+
 // Mount MCP routes
 app.use('/api/mcp', createMCPRouter(mcpService));
 

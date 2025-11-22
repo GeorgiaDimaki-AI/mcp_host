@@ -366,7 +366,7 @@ describe('WebviewRenderer', () => {
       const iframe = container.querySelector('iframe');
       expect(iframe?.className).toContain('w-full');
       expect(iframe?.className).toContain('border-0');
-      expect(iframe?.style.minHeight).toBe('250px');
+      expect(iframe?.style.minHeight).toBe('300px');
     });
   });
 });

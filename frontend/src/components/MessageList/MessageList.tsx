@@ -32,7 +32,7 @@ export function MessageList({ messages, isLoading, onWebviewMessage }: MessageLi
           </div>
         </div>
       ) : (
-        <>
+        <div className="max-w-4xl mx-auto">
           {messages.map((message) => (
             <MessageItem
               key={message.id}
@@ -55,7 +55,7 @@ export function MessageList({ messages, isLoading, onWebviewMessage }: MessageLi
           )}
 
           <div ref={messagesEndRef} />
-        </>
+        </div>
       )}
     </div>
   );

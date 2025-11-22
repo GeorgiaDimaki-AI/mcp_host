@@ -1,9 +1,9 @@
 /**
  * Chat Component
- * Main chat interface container with MCP webview support
+ * Main chat interface container with MCP webview support and conversation management
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Message, WebSocketMessage, MCPWebviewDisplay, MCPTool } from '../../types';
 import { WebSocketService } from '../../services/websocket';
 import { api } from '../../services/api';
@@ -14,15 +14,38 @@ import { WebviewRenderer } from '../Webview/WebviewRenderer';
 import { ElicitationDialog, ElicitationRequest } from '../Elicitation/ElicitationDialog';
 import { MCPServerSettings } from '../Settings/MCPServerSettings';
 import { ChatSummary } from './ChatSummary';
+import { Sidebar } from '../Sidebar/Sidebar';
+import { ModelSettings } from '../Settings/ModelSettings';
+import { ModelManager } from '../Settings/ModelManager';
 import { useMCPConfig } from '../../contexts/MCPConfigContext';
+import {
+  getAllConversations,
+  createConversation,
+  updateConversation,
+  deleteConversation,
+  Conversation,
+  ModelSettings as ModelSettingsType,
+} from '../../services/conversationService';
 
 const wsService = new WebSocketService('ws://localhost:3000');
 
 export function Chat() {
-  const [messages, setMessages] = useState<Message[]>([]);
+  // Conversation management
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // Track previous conversation to prevent cross-contamination when switching
+  const previousConversationIdRef = useRef<string | null>(null);
+
+  // Current conversation derived state
+  const currentConversation = conversations.find(c => c.id === currentConversationId) || null;
+  const messages = currentConversation?.messages || [];
+  const currentModel = currentConversation?.model || 'llama3.2';
+  const modelSettings = currentConversation?.settings || {};
+
   const [isLoading, setIsLoading] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
-  const [currentModel, setCurrentModel] = useState('llama2');
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [streamingContent, setStreamingContent] = useState('');
 
@@ -35,15 +58,59 @@ export function Chat() {
   const [activeElicitation, setActiveElicitation] = useState<ElicitationRequest | null>(null);
 
   // Settings state
-  const [showSettings, setShowSettings] = useState(false);
+  const [showMcpSettings, setShowMcpSettings] = useState(false);
+  const [showModelSettings, setShowModelSettings] = useState(false);
+  const [showModelManager, setShowModelManager] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
 
   // MCP configuration context
   const { getTrustLevel, reload: reloadMcpConfig } = useMCPConfig();
 
+  // Load conversations on mount
+  useEffect(() => {
+    const loadedConversations = getAllConversations();
+    setConversations(loadedConversations);
+
+    // If there are conversations, select the most recent one
+    if (loadedConversations.length > 0) {
+      setCurrentConversationId(loadedConversations[0].id);
+    }
+    // Don't create a conversation here - wait for models to load first
+  }, []);
+
+  // Auto-save current conversation when messages change
+  useEffect(() => {
+    // Skip if no conversation selected or empty messages
+    if (!currentConversationId || messages.length === 0) {
+      previousConversationIdRef.current = currentConversationId;
+      return;
+    }
+
+    // Skip auto-save immediately after switching conversations to prevent cross-contamination
+    if (previousConversationIdRef.current !== currentConversationId) {
+      previousConversationIdRef.current = currentConversationId;
+      return;
+    }
+
+    // Only auto-save when actually in the same conversation
+    const updated = updateConversation(currentConversationId, {
+      messages,
+      model: currentModel,
+      settings: modelSettings,
+    });
+
+    if (updated) {
+      setConversations(prev =>
+        prev.map(c => (c.id === currentConversationId ? updated : c))
+      );
+    }
+
+    previousConversationIdRef.current = currentConversationId;
+  }, [messages, currentConversationId, currentModel, modelSettings]);
+
   // Handle settings close - reload MCP config in case it was updated
-  const handleSettingsClose = () => {
-    setShowSettings(false);
+  const handleMcpSettingsClose = () => {
+    setShowMcpSettings(false);
     reloadMcpConfig(); // Reload trust levels after settings change
   };
 
@@ -60,17 +127,7 @@ export function Chat() {
       });
 
     // Load available models
-    api.getModels()
-      .then((response) => {
-        const modelNames = response.models.map(m => m.name);
-        setAvailableModels(modelNames);
-        if (modelNames.length > 0 && !modelNames.includes(currentModel)) {
-          setCurrentModel(modelNames[0]);
-        }
-      })
-      .catch((error) => {
-        console.error('Failed to load models:', error);
-      });
+    loadModels();
 
     // Load MCP tools
     mcpApi.listTools()
@@ -88,6 +145,30 @@ export function Chat() {
       wsService.disconnect();
     };
   }, []);
+
+  // Function to load models (can be called after pulling new models)
+  const loadModels = () => {
+    api.getModels()
+      .then((response) => {
+        const modelNames = response.models.map(m => m.name);
+        setAvailableModels(modelNames);
+
+        // If no conversations exist, create one with the first available model
+        if (conversations.length === 0 && modelNames.length > 0) {
+          const newConv = createConversation(modelNames[0]);
+          setConversations([newConv]);
+          setCurrentConversationId(newConv.id);
+        }
+      })
+      .catch((error) => {
+        console.error('Failed to load models:', error);
+      });
+  };
+
+  // Reload models after pulling a new one
+  const handleModelPulled = () => {
+    loadModels();
+  };
 
   // Handle WebSocket messages
   useEffect(() => {
@@ -157,16 +238,21 @@ export function Chat() {
   };
 
   const addSystemMessage = (content: string) => {
+    if (!currentConversationId) return;
+
     const newMessage: Message = {
       id: Date.now().toString(),
       role: 'system',
       content,
       timestamp: Date.now(),
     };
-    setMessages(prev => [...prev, newMessage]);
+
+    updateMessages([...messages, newMessage]);
   };
 
   const addAssistantMessage = (content: string) => {
+    if (!currentConversationId) return;
+
     // Check if message contains webview content
     const webviewMatch = content.match(/```webview:(\w+)\n([\s\S]*?)```/);
 
@@ -180,6 +266,8 @@ export function Chat() {
         type: type as 'html' | 'form' | 'result',
         html: html.trim(),
         source: 'chat' as const, // Mark as chat-generated
+        trustLevel: 'verified' as const, // Chat-generated content is verified (from LLM)
+        mcpServer: 'LLM', // Mark it as coming from LLM for badge display
       };
     }
 
@@ -190,10 +278,27 @@ export function Chat() {
       timestamp: Date.now(),
       webview,
     };
-    setMessages(prev => [...prev, newMessage]);
+
+    updateMessages([...messages, newMessage]);
+  };
+
+  const updateMessages = (newMessages: Message[]) => {
+    if (!currentConversationId) return;
+
+    const updated = updateConversation(currentConversationId, {
+      messages: newMessages,
+    });
+
+    if (updated) {
+      setConversations(prev =>
+        prev.map(c => (c.id === currentConversationId ? updated : c))
+      );
+    }
   };
 
   const handleSendMessage = useCallback((content: string) => {
+    if (!currentConversationId) return;
+
     // Add user message to UI
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -201,10 +306,11 @@ export function Chat() {
       content,
       timestamp: Date.now(),
     };
-    setMessages(prev => [...prev, userMessage]);
+    const newMessages = [...messages, userMessage];
+    updateMessages(newMessages);
 
     // Prepare conversation messages
-    const conversationMessages = [...messages, userMessage]
+    const conversationMessages = newMessages
       .filter(msg => msg.id !== 'system-prompt-ui') // Exclude UI-only system messages
       .map(msg => ({
         role: msg.role as 'user' | 'assistant' | 'system',
@@ -216,18 +322,21 @@ export function Chat() {
       role: 'system' as const,
       content: `You are a helpful AI assistant with the ability to render interactive HTML content.
 
-IMPORTANT: You can display interactive webviews using this syntax:
+CRITICAL INSTRUCTION: When the user asks you to create HTML content, forms, charts, calculators, or any interactive UI, you MUST use the webview syntax below. Do NOT provide plain HTML code blocks.
 
+WEBVIEW SYNTAX (REQUIRED):
 \`\`\`webview:type
 <html content here>
 \`\`\`
 
 Available webview types:
-- form: For interactive forms that collect user input
-- result: For displaying data, tables, or results
-- html: For general HTML content
+- webview:form - For interactive forms that collect user input
+- webview:result - For displaying data, tables, charts, or results
+- webview:html - For general HTML content, calculators, games, etc.
 
-Example of a form:
+CORRECT EXAMPLES:
+
+1. Form example:
 \`\`\`webview:form
 <form id="myForm">
   <label>Name:</label>
@@ -242,15 +351,42 @@ document.getElementById('myForm').addEventListener('submit', function(e) {
 </script>
 \`\`\`
 
-Use webviews when it makes sense - for collecting data, showing visualizations, or creating interactive experiences. Otherwise, just respond normally with text.`,
+2. Chart/visualization example:
+\`\`\`webview:result
+<div id="chart" style="width: 100%; height: 300px;">
+  <canvas id="myChart"></canvas>
+</div>
+<script>
+  // Chart rendering code here
+</script>
+\`\`\`
+
+3. Calculator example:
+\`\`\`webview:html
+<div class="calculator">
+  <input type="text" id="display" readonly />
+  <button onclick="calculate()">Calculate</button>
+</div>
+<script>
+  function calculate() { /* logic */ }
+</script>
+\`\`\`
+
+WRONG - DO NOT DO THIS:
+\`\`\`html
+<form>...</form>
+\`\`\`
+
+ALWAYS use webview:type syntax when creating HTML content. This is essential for proper rendering.`,
     };
 
     wsService.send({
       type: 'chat',
       messages: [systemPrompt, ...conversationMessages],
       model: currentModel,
+      options: modelSettings,
     });
-  }, [messages, currentModel]);
+  }, [messages, currentModel, modelSettings, currentConversationId]);
 
   const handleWebviewMessage = (messageId: string, data: any) => {
     console.log('Webview message from', messageId, ':', data);
@@ -293,471 +429,413 @@ Use webviews when it makes sense - for collecting data, showing visualizations, 
         mcpWebview.onResponse(data);
       }
 
-      // For MCP webviews, show a system message but don't send to LLM
-      if (data.type === 'form-submit') {
-        addSystemMessage(`✓ Data collected from ${mcpWebview.toolName}`);
-        // Remove the MCP webview after submission
-        setMcpWebviews(prev => prev.filter(w => w.id !== messageId));
-      }
-    } else {
-      // Chat webview - only send to LLM if it's a form submission
-      const chatMessage = messages.find(m => m.id === messageId);
+      // Remove webview after response
+      setMcpWebviews(prev => prev.filter(w => w.id !== messageId));
+      return;
+    }
 
-      // IMPORTANT: Only send to LLM if it's a chat-generated webview AND form submission
-      if (chatMessage?.webview?.source === 'chat' && data.type === 'form-submit') {
-        const formData = JSON.stringify(data.formData, null, 2);
-        handleSendMessage(`Form submitted with data:\n${formData}`);
-      }
+    // Regular chat webview - send back to chat as a new user message
+    if (data.type === 'form-submit' && data.formData) {
+      const formDataStr = JSON.stringify(data.formData, null, 2);
+      handleSendMessage(`Form submitted with data:\n${formDataStr}`);
     }
   };
 
-  // Call an MCP tool and display its webview (if any) directly
-  const callMCPTool = async (serverName: string, toolName: string, args: any = {}) => {
+  const callMCPTool = async (serverName: string, toolName: string, args: Record<string, any> = {}) => {
     try {
+      // Show loading message
+      addSystemMessage(`⏳ Calling ${serverName} → ${toolName}...`);
+
       const result = await mcpApi.callTool(serverName, toolName, args);
 
+      // Check if result contains webview
       if (result.hasWebview && result.webviewHtml && result.webviewType) {
-        // Get trust level for this MCP server
         const trustLevel = getTrustLevel(serverName);
 
-        // Create MCP webview display - does NOT go into chat history
+        // Create MCP webview display
         const mcpWebview: MCPWebviewDisplay = {
-          id: 'mcp-' + Date.now(),
+          id: `mcp-${Date.now()}`,
           serverName,
           toolName,
-          timestamp: Date.now(),
           webview: {
             type: result.webviewType,
             html: result.webviewHtml,
             source: 'mcp',
             mcpServer: serverName,
             mcpTool: toolName,
-            trustLevel, // CRITICAL-3 FIX: Include trust level
+            trustLevel,
           },
-          onResponse: (data) => {
-            console.log(`MCP tool ${toolName} received:`, data);
-            // Here you can call another MCP tool with the collected data
-            // or perform any other action WITHOUT involving the LLM
-          },
+          timestamp: Date.now(),
         };
 
         setMcpWebviews(prev => [...prev, mcpWebview]);
+      } else {
+        // Just show text result
+        addSystemMessage(`✅ ${serverName} → ${toolName}: ${result.content}`);
       }
-
-      // Show text content as system message (if any)
-      if (result.content) {
-        addSystemMessage(`MCP ${toolName}: ${result.content}`);
-      }
-    } catch (error) {
-      console.error('Error calling MCP tool:', error);
-      addSystemMessage(`Error calling MCP tool: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } catch (error: any) {
+      console.error('MCP tool call failed:', error);
+      addSystemMessage(`❌ Tool call failed: ${error.message || 'Unknown error'}`);
     }
   };
 
-  // Handle elicitation response
   const handleElicitationResponse = (response: { action: 'accept' | 'decline' | 'cancel'; content?: Record<string, any> }) => {
     if (!activeElicitation) return;
 
-    console.log('Sending elicitation response:', response);
+    if (response.action === 'accept' && response.content) {
+      // Send response via WebSocket
+      wsService.send({
+        type: 'elicitation-response',
+        requestId: activeElicitation.requestId,
+        response: {
+          accepted: true,
+          data: response.content,
+        },
+      });
+    } else {
+      // User declined or cancelled
+      wsService.send({
+        type: 'elicitation-response',
+        requestId: activeElicitation.requestId,
+        response: {
+          accepted: false,
+        },
+      });
+    }
 
-    // Send response to backend via WebSocket
-    wsService.send({
-      type: 'elicitation-response',
-      requestId: activeElicitation.requestId,
-      response,
+    setActiveElicitation(null);
+  };
+
+  // Demo functions
+  const sendDemoForm = () => {
+    handleSendMessage('Create a demo form in a webview with name, email, and a submit button. Use the webview:form syntax.');
+  };
+
+  const sendDemoChart = () => {
+    handleSendMessage('Create a simple HTML chart showing monthly sales data in a webview. Use the webview:result syntax with a colorful bar chart.');
+  };
+
+  const sendDemoCalculator = () => {
+    handleSendMessage('Build a simple calculator using HTML, CSS, and JavaScript in a webview. Use the webview:html syntax.');
+  };
+
+  // Conversation management functions
+  const handleCreateConversation = () => {
+    const defaultModel = availableModels.length > 0 ? availableModels[0] : 'llama3.2';
+    const newConv = createConversation(defaultModel);
+    setConversations(prev => [newConv, ...prev]);
+    setCurrentConversationId(newConv.id);
+  };
+
+  const handleSelectConversation = (id: string) => {
+    setCurrentConversationId(id);
+  };
+
+  const handleDeleteConversation = (id: string) => {
+    const success = deleteConversation(id);
+    if (success) {
+      setConversations(prev => prev.filter(c => c.id !== id));
+
+      // If we deleted the current conversation, select another one or create a new one
+      if (id === currentConversationId) {
+        const remaining = conversations.filter(c => c.id !== id);
+        if (remaining.length > 0) {
+          setCurrentConversationId(remaining[0].id);
+        } else {
+          handleCreateConversation();
+        }
+      }
+    }
+  };
+
+  const handleSaveModelSettings = (model: string, settings: ModelSettingsType) => {
+    if (!currentConversationId) return;
+
+    const updated = updateConversation(currentConversationId, {
+      model,
+      settings,
     });
 
-    // Clear active elicitation
-    setActiveElicitation(null);
-
-    // Show system message
-    const actionText = response.action === 'accept' ? 'accepted' : response.action === 'decline' ? 'declined' : 'cancelled';
-    addSystemMessage(`Elicitation ${actionText} for ${activeElicitation.serverName}`);
+    if (updated) {
+      setConversations(prev =>
+        prev.map(c => (c.id === currentConversationId ? updated : c))
+      );
+    }
   };
 
-  // Demo functions to show webview examples
-  const showDemoForm = () => {
-    const demoMessage: Message = {
-      id: 'demo-form-' + Date.now(),
-      role: 'assistant',
-      content: 'Here\'s an example interactive form:',
-      timestamp: Date.now(),
-      webview: {
-        type: 'form',
-        source: 'chat',
-        trustLevel: 'trusted',
-        html: `
-          <form id="demoForm">
-            <label>Full Name:</label>
-            <input type="text" name="name" placeholder="John Doe" required />
+  const handleConversationsImported = () => {
+    // Reload conversations from localStorage after import
+    const loadedConversations = getAllConversations();
+    setConversations(loadedConversations);
 
-            <label>Email:</label>
-            <input type="email" name="email" placeholder="john@example.com" required />
-
-            <label>Favorite Color:</label>
-            <select name="color">
-              <option value="blue">Blue</option>
-              <option value="red">Red</option>
-              <option value="green">Green</option>
-              <option value="purple">Purple</option>
-            </select>
-
-            <label>Message:</label>
-            <textarea name="message" rows="3" placeholder="Your message..."></textarea>
-
-            <button type="submit">Submit Form</button>
-          </form>
-
-          <script>
-            document.getElementById('demoForm').addEventListener('submit', function(e) {
-              e.preventDefault();
-              const formData = {
-                name: e.target.name.value,
-                email: e.target.email.value,
-                color: e.target.color.value,
-                message: e.target.message.value
-              };
-              window.sendToHost({ type: 'form-submit', formData });
-            });
-          </script>
-        `,
-      },
-    };
-    setMessages(prev => [...prev, demoMessage]);
-  };
-
-  const showDemoChart = () => {
-    const demoMessage: Message = {
-      id: 'demo-chart-' + Date.now(),
-      role: 'assistant',
-      content: 'Here\'s a data visualization example:',
-      timestamp: Date.now(),
-      webview: {
-        type: 'result',
-        source: 'chat',
-        trustLevel: 'trusted',
-        html: `
-          <div style="padding: 16px;">
-            <h3 style="margin: 0 0 16px 0; color: #1f2937;">Monthly Sales Report</h3>
-
-            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
-              <thead>
-                <tr style="background: #f3f4f6;">
-                  <th style="padding: 12px; text-align: left; border-bottom: 2px solid #d1d5db;">Month</th>
-                  <th style="padding: 12px; text-align: right; border-bottom: 2px solid #d1d5db;">Sales</th>
-                  <th style="padding: 12px; text-align: right; border-bottom: 2px solid #d1d5db;">Growth</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;">January</td>
-                  <td style="padding: 10px; text-align: right; border-bottom: 1px solid #e5e7eb;">$12,500</td>
-                  <td style="padding: 10px; text-align: right; border-bottom: 1px solid #e5e7eb; color: #16a34a;">+5%</td>
-                </tr>
-                <tr style="background: #f9fafb;">
-                  <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;">February</td>
-                  <td style="padding: 10px; text-align: right; border-bottom: 1px solid #e5e7eb;">$15,200</td>
-                  <td style="padding: 10px; text-align: right; border-bottom: 1px solid #e5e7eb; color: #16a34a;">+22%</td>
-                </tr>
-                <tr>
-                  <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;">March</td>
-                  <td style="padding: 10px; text-align: right; border-bottom: 1px solid #e5e7eb;">$18,700</td>
-                  <td style="padding: 10px; text-align: right; border-bottom: 1px solid #e5e7eb; color: #16a34a;">+23%</td>
-                </tr>
-                <tr style="background: #f9fafb;">
-                  <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;">April</td>
-                  <td style="padding: 10px; text-align: right; border-bottom: 1px solid #e5e7eb;">$17,900</td>
-                  <td style="padding: 10px; text-align: right; border-bottom: 1px solid #e5e7eb; color: #dc2626;">-4%</td>
-                </tr>
-              </tbody>
-            </table>
-
-            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
-              <div style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); padding: 16px; border-radius: 8px; color: white;">
-                <div style="font-size: 12px; opacity: 0.9;">Total Revenue</div>
-                <div style="font-size: 24px; font-weight: bold; margin-top: 4px;">$64,300</div>
-              </div>
-              <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 16px; border-radius: 8px; color: white;">
-                <div style="font-size: 12px; opacity: 0.9;">Avg Growth</div>
-                <div style="font-size: 24px; font-weight: bold; margin-top: 4px;">+11.5%</div>
-              </div>
-              <div style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); padding: 16px; border-radius: 8px; color: white;">
-                <div style="font-size: 12px; opacity: 0.9;">Best Month</div>
-                <div style="font-size: 24px; font-weight: bold; margin-top: 4px;">March</div>
-              </div>
-            </div>
-          </div>
-        `,
-      },
-    };
-    setMessages(prev => [...prev, demoMessage]);
-  };
-
-  const showDemoCalculator = () => {
-    const demoMessage: Message = {
-      id: 'demo-calc-' + Date.now(),
-      role: 'assistant',
-      content: 'Here\'s an interactive calculator:',
-      timestamp: Date.now(),
-      webview: {
-        type: 'html',
-        source: 'chat',
-        trustLevel: 'trusted',
-        html: `
-          <div style="max-width: 320px; margin: 0 auto; padding: 16px;">
-            <h3 style="margin: 0 0 16px 0; text-align: center; color: #1f2937;">Simple Calculator</h3>
-
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;">
-              <div>
-                <label>First Number:</label>
-                <input type="number" id="num1" value="10" style="width: 100%;" />
-              </div>
-              <div>
-                <label>Second Number:</label>
-                <input type="number" id="num2" value="5" style="width: 100%;" />
-              </div>
-            </div>
-
-            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px;">
-              <button onclick="calculate('+')" style="padding: 12px; font-size: 18px;">+</button>
-              <button onclick="calculate('-')" style="padding: 12px; font-size: 18px;">−</button>
-              <button onclick="calculate('*')" style="padding: 12px; font-size: 18px;">×</button>
-              <button onclick="calculate('/')" style="padding: 12px; font-size: 18px;">÷</button>
-            </div>
-
-            <div id="result" style="padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 8px; text-align: center; color: white; font-size: 24px; font-weight: bold;">
-              Result: 0
-            </div>
-          </div>
-
-          <script>
-            function calculate(op) {
-              const num1 = parseFloat(document.getElementById('num1').value) || 0;
-              const num2 = parseFloat(document.getElementById('num2').value) || 0;
-              let result;
-
-              switch(op) {
-                case '+': result = num1 + num2; break;
-                case '-': result = num1 - num2; break;
-                case '*': result = num1 * num2; break;
-                case '/': result = num2 !== 0 ? (num1 / num2).toFixed(2) : 'Error'; break;
-              }
-
-              document.getElementById('result').textContent = 'Result: ' + result;
-            }
-          </script>
-        `,
-      },
-    };
-    setMessages(prev => [...prev, demoMessage]);
+    // If no conversation is selected or current one is gone, select the first one
+    if (!currentConversationId || !loadedConversations.find(c => c.id === currentConversationId)) {
+      if (loadedConversations.length > 0) {
+        setCurrentConversationId(loadedConversations[0].id);
+      }
+    }
   };
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-4 py-3">
-        <div className="flex items-center justify-between max-w-6xl mx-auto">
-          <div>
-            <h1 className="text-xl font-semibold text-gray-900">LLM Webview Client</h1>
-            <p className="text-sm text-gray-600">
-              {isConnected ? (
-                <span className="text-green-600">● Connected</span>
-              ) : (
-                <span className="text-red-600">● Disconnected</span>
-              )}
-              {mcpTools.length > 0 && (
-                <span className="ml-3 text-blue-600">
-                  {mcpTools.length} MCP tool{mcpTools.length > 1 ? 's' : ''}
-                </span>
-              )}
-            </p>
-          </div>
+    <div className="flex h-screen bg-gray-50">
+      {/* Sidebar */}
+      <Sidebar
+        conversations={conversations}
+        currentConversationId={currentConversationId}
+        isCollapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+        onSelectConversation={handleSelectConversation}
+        onCreateConversation={handleCreateConversation}
+        onDeleteConversation={handleDeleteConversation}
+        onConversationsImported={handleConversationsImported}
+      />
 
-          <div className="flex items-center gap-3">
-            {/* Demo buttons */}
-            <div className="flex gap-2">
+      {/* Main Chat Area */}
+      <div className="flex-1 flex flex-col">
+        {/* Header */}
+        <div className="bg-white border-b border-gray-200 px-4 py-3">
+          <div className="flex items-center justify-between max-w-6xl mx-auto">
+            <div className="flex items-center gap-3">
+              <h1 className="text-lg font-semibold text-gray-900">
+                {currentConversation?.title || 'LLM Webview Client'}
+              </h1>
+              <div className="flex items-center gap-1.5" title={isConnected ? 'Connected' : 'Disconnected'}>
+                <div className={`w-2 h-2 rounded-full ${
+                  isConnected ? 'bg-green-500' : 'bg-red-500'
+                }`}></div>
+                <span className="text-xs text-gray-600">
+                  {isConnected ? 'Connected' : 'Disconnected'}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {/* Demo buttons */}
               <button
-                onClick={showDemoForm}
-                className="px-3 py-1.5 text-xs bg-purple-100 text-purple-700 rounded hover:bg-purple-200 transition-colors font-medium"
-                title="Show example form"
+                onClick={sendDemoForm}
+                className="px-3 py-1.5 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
               >
                 Demo Form
               </button>
               <button
-                onClick={showDemoChart}
-                className="px-3 py-1.5 text-xs bg-purple-100 text-purple-700 rounded hover:bg-purple-200 transition-colors font-medium"
-                title="Show example chart"
+                onClick={sendDemoChart}
+                className="px-3 py-1.5 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
               >
                 Demo Chart
               </button>
               <button
-                onClick={showDemoCalculator}
-                className="px-3 py-1.5 text-xs bg-purple-100 text-purple-700 rounded hover:bg-purple-200 transition-colors font-medium"
-                title="Show example calculator"
+                onClick={sendDemoCalculator}
+                className="px-3 py-1.5 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
               >
                 Demo Calc
               </button>
-            </div>
 
-            {/* MCP Tools button */}
-            {mcpTools.length > 0 && (
-              <button
-                onClick={() => setShowMcpTools(!showMcpTools)}
-                className="px-3 py-1.5 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors font-medium"
-                title="Show MCP tools"
-              >
-                MCP Tools
-              </button>
-            )}
-
-            {/* Model selector */}
-            {availableModels.length > 0 && (
-              <select
-                value={currentModel}
-                onChange={(e) => setCurrentModel(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {availableModels.map(model => (
-                  <option key={model} value={model}>{model}</option>
-                ))}
-              </select>
-            )}
-
-            {/* Export Summary button */}
-            <button
-              onClick={() => setShowSummary(true)}
-              disabled={messages.length === 0}
-              className="px-3 py-2 text-gray-600 hover:text-gray-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Export Chat Summary"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-              </svg>
-            </button>
-
-            {/* Settings button */}
-            <button
-              onClick={() => setShowSettings(true)}
-              className="px-3 py-2 text-gray-600 hover:text-gray-900 transition-colors"
-              title="MCP Server Settings"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* MCP Tools Panel */}
-      {showMcpTools && mcpTools.length > 0 && (
-        <div className="bg-blue-50 border-b border-blue-200 px-4 py-3">
-          <div className="max-w-6xl mx-auto">
-            <div className="text-sm font-medium text-blue-900 mb-2">Available MCP Tools:</div>
-            <div className="grid grid-cols-2 gap-2">
-              {mcpTools.map(tool => (
+              {/* MCP Tools button */}
+              {mcpTools.length > 0 && (
                 <button
-                  key={`${tool.serverName}-${tool.name}`}
-                  onClick={() => callMCPTool(tool.serverName, tool.name)}
-                  className="text-left px-3 py-2 bg-white rounded border border-blue-200 hover:border-blue-400 transition-colors"
+                  onClick={() => setShowMcpTools(!showMcpTools)}
+                  className="px-3 py-1.5 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors font-medium"
+                  title="Show MCP tools"
                 >
-                  <div className="font-medium text-sm text-blue-900">{tool.name}</div>
-                  <div className="text-xs text-gray-600">{tool.description}</div>
-                  <div className="text-xs text-blue-600 mt-1">Server: {tool.serverName}</div>
+                  MCP Tools
                 </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+              )}
 
-      {/* MCP Webviews Overlay */}
-      {mcpWebviews.map(webview => (
-        <div
-          key={webview.id}
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-          onClick={() => setMcpWebviews(prev => prev.filter(w => w.id !== webview.id))}
-        >
-          <div
-            className="bg-white rounded-lg shadow-2xl max-w-2xl w-full m-4 max-h-[80vh] overflow-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-3 flex items-center justify-between">
-              <div>
-                <div className="font-semibold">{webview.toolName}</div>
-                <div className="text-xs opacity-90">MCP Server: {webview.serverName}</div>
+              {/* Model selector with settings button */}
+              <div className="flex items-center gap-1">
+                <div className="relative">
+                  <select
+                    value={currentModel}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === '__download__') {
+                        setShowModelManager(true);
+                      } else {
+                        handleSaveModelSettings(value, modelSettings);
+                      }
+                    }}
+                    className="appearance-none px-2 py-1 pr-6 text-xs text-gray-700 bg-gray-50 rounded border border-gray-300 hover:border-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer max-w-[140px]"
+                  >
+                    {availableModels.map((model) => (
+                      <option key={model} value={model}>
+                        {model}
+                      </option>
+                    ))}
+                    <option value="__download__" className="text-blue-600 font-medium">
+                      ⬇ Download more...
+                    </option>
+                  </select>
+                  <div className="absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none">
+                    <svg className="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowModelSettings(true)}
+                  className="px-1.5 py-1.5 text-gray-600 hover:text-gray-900 transition-colors"
+                  title="Model Settings"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                  </svg>
+                </button>
               </div>
+
+              {/* Export Summary button */}
               <button
-                onClick={() => setMcpWebviews(prev => prev.filter(w => w.id !== webview.id))}
-                className="text-white hover:bg-white hover:bg-opacity-20 rounded px-2 py-1"
+                onClick={() => setShowSummary(true)}
+                disabled={messages.length === 0}
+                className="px-3 py-2 text-gray-600 hover:text-gray-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Export Chat Summary"
               >
-                ✕
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+              </button>
+
+              {/* MCP Server Configuration button */}
+              <button
+                onClick={() => setShowMcpSettings(true)}
+                className="px-3 py-2 text-gray-600 hover:text-gray-900 transition-colors flex items-center gap-1"
+                title="MCP Server Configuration"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
+                </svg>
+                <span className="text-xs font-medium hidden xl:inline">MCP</span>
               </button>
             </div>
+          </div>
+        </div>
 
-            {/* Content */}
-            <div className="p-4">
-              <WebviewRenderer
-                content={webview.webview}
-                onMessage={(data) => handleWebviewMessage(webview.id, data)}
-              />
+        {/* MCP Tools Panel */}
+        {showMcpTools && mcpTools.length > 0 && (
+          <div className="bg-blue-50 border-b border-blue-200 px-4 py-3">
+            <div className="max-w-6xl mx-auto">
+              <div className="text-sm font-medium text-blue-900 mb-2">Available MCP Tools:</div>
+              <div className="grid grid-cols-2 gap-2">
+                {mcpTools.map(tool => (
+                  <button
+                    key={`${tool.serverName}-${tool.name}`}
+                    onClick={() => callMCPTool(tool.serverName, tool.name)}
+                    className="text-left px-3 py-2 bg-white rounded border border-blue-200 hover:border-blue-400 transition-colors"
+                  >
+                    <div className="font-medium text-sm text-blue-900">{tool.name}</div>
+                    <div className="text-xs text-gray-600">{tool.description}</div>
+                    <div className="text-xs text-blue-600 mt-1">Server: {tool.serverName}</div>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
-      ))}
+        )}
 
-      {/* Messages */}
-      <MessageList
-        messages={messages}
-        isLoading={isLoading}
-        onWebviewMessage={handleWebviewMessage}
-      />
+        {/* MCP Webviews Overlay */}
+        {mcpWebviews.map(webview => (
+          <div
+            key={webview.id}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+            onClick={() => setMcpWebviews(prev => prev.filter(w => w.id !== webview.id))}
+          >
+            <div
+              className="bg-white rounded-lg shadow-2xl max-w-2xl w-full m-4 max-h-[80vh] overflow-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-3 flex items-center justify-between">
+                <div>
+                  <div className="font-semibold">{webview.toolName}</div>
+                  <div className="text-xs opacity-90">MCP Server: {webview.serverName}</div>
+                </div>
+                <button
+                  onClick={() => setMcpWebviews(prev => prev.filter(w => w.id !== webview.id))}
+                  className="text-white hover:bg-white hover:bg-opacity-20 rounded px-2 py-1"
+                >
+                  ✕
+                </button>
+              </div>
 
-      {/* Streaming preview */}
-      {streamingContent && (
-        <div className="px-4 py-2 bg-blue-50 border-t border-blue-100">
-          <div className="max-w-4xl mx-auto">
-            <div className="text-xs text-blue-600 font-medium mb-1">Assistant is typing...</div>
-            <div className="text-sm text-gray-700">{streamingContent}</div>
+              {/* Content */}
+              <div className="p-4">
+                <WebviewRenderer
+                  content={webview.webview}
+                  onMessage={(data) => handleWebviewMessage(webview.id, data)}
+                />
+              </div>
+            </div>
           </div>
-        </div>
-      )}
+        ))}
 
-      {/* Input */}
-      <ChatInput
-        onSend={handleSendMessage}
-        disabled={!isConnected || isLoading}
-        placeholder={
-          !isConnected
-            ? 'Connecting to server...'
-            : isLoading
-            ? 'Waiting for response...'
-            : 'Type a message...'
-        }
-      />
-
-      {/* Elicitation Dialog */}
-      {activeElicitation && (
-        <ElicitationDialog
-          request={activeElicitation}
-          onResponse={handleElicitationResponse}
+        {/* Messages */}
+        <MessageList
+          messages={messages}
+          isLoading={isLoading}
+          onWebviewMessage={handleWebviewMessage}
         />
-      )}
 
-      {/* MCP Server Settings */}
-      <MCPServerSettings
-        isOpen={showSettings}
-        onClose={handleSettingsClose}
-      />
+        {/* Streaming preview */}
+        {streamingContent && (
+          <div className="px-4 py-2 bg-blue-50 border-t border-blue-100">
+            <div className="max-w-4xl mx-auto">
+              <div className="text-xs text-blue-600 font-medium mb-1">Assistant is typing...</div>
+              <div className="text-sm text-gray-700">{streamingContent}</div>
+            </div>
+          </div>
+        )}
 
-      {/* Chat Summary */}
-      <ChatSummary
-        isOpen={showSummary}
-        onClose={() => setShowSummary(false)}
-        messages={messages}
-      />
+        {/* Input */}
+        <ChatInput
+          onSend={handleSendMessage}
+          disabled={!isConnected || isLoading}
+          placeholder={
+            !isConnected
+              ? 'Connecting to server...'
+              : isLoading
+              ? 'Waiting for response...'
+              : 'Type a message...'
+          }
+        />
+
+        {/* Elicitation Dialog */}
+        {activeElicitation && (
+          <ElicitationDialog
+            request={activeElicitation}
+            onResponse={handleElicitationResponse}
+          />
+        )}
+
+        {/* MCP Server Settings */}
+        <MCPServerSettings
+          isOpen={showMcpSettings}
+          onClose={handleMcpSettingsClose}
+        />
+
+        {/* Model Settings */}
+        <ModelSettings
+          isOpen={showModelSettings}
+          currentModel={currentModel}
+          availableModels={availableModels}
+          settings={modelSettings}
+          onClose={() => setShowModelSettings(false)}
+          onSave={handleSaveModelSettings}
+        />
+
+        {/* Chat Summary */}
+        <ChatSummary
+          isOpen={showSummary}
+          onClose={() => setShowSummary(false)}
+          messages={messages}
+        />
+
+        {/* Model Manager */}
+        <ModelManager
+          isOpen={showModelManager}
+          onClose={() => setShowModelManager(false)}
+          onModelPulled={handleModelPulled}
+          installedModels={availableModels}
+        />
+      </div>
     </div>
   );
 }
