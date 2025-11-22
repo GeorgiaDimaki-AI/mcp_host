@@ -1,6 +1,6 @@
 {
   "name": "mcp-webview-host",
-  "version": "1.0.0",
+  "version": "0.1.0-beta.1",
   "description": "Secure webview host for Model Context Protocol (MCP) servers with elicitation support",
   "main": "backend/dist/server.js",
   "bin": {
@@ -35,8 +35,16 @@
     "type": "git",
     "url": "https://github.com/GeorgiaDimaki-AI/mcp_host.git"
   },
+  "homepage": "https://github.com/GeorgiaDimaki-AI/mcp_host#readme",
+  "bugs": {
+    "url": "https://github.com/GeorgiaDimaki-AI/mcp_host/issues"
+  },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "tag": "beta"
   },
   "files": [
     "backend/dist",

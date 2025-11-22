@@ -1,0 +1,45 @@
+# Source files (only ship dist/)
+frontend/src/
+backend/src/
+
+# Test files
+frontend/src/tests/
+backend/src/__tests__/
+**/*.test.ts
+**/*.test.tsx
+coverage/
+.vitest/
+
+# Development files
+node_modules/
+.git/
+.gitignore
+*.log
+*.lock
+
+# Config files for development
+frontend/tsconfig.json
+frontend/vite.config.ts
+frontend/vitest.config.ts
+frontend/tailwind.config.js
+frontend/postcss.config.js
+backend/tsconfig.json
+backend/jest.config.js
+
+# IDE and OS files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# Documentation source (keep README.md and docs/)
+# but exclude development docs
+docs/*_Implementation.md
