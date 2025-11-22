@@ -9,9 +9,14 @@ import { WebSocketServer, WebSocket } from 'ws';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { readFileSync, existsSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 import { OllamaService, OllamaMessage } from './services/ollama.js';
 import { MCPService, MCPServer } from './services/mcp.js';
 import { createMCPRouter } from './routes/mcp.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 dotenv.config();
 
@@ -152,6 +157,26 @@ app.get('/api/models', async (req, res) => {
 
 // Mount MCP routes
 app.use('/api/mcp', createMCPRouter(mcpService));
+
+// Serve static files from frontend/dist
+// When running from installed package, frontend/dist is at ../../frontend/dist from server.js
+const frontendPath = join(__dirname, '..', '..', 'frontend', 'dist');
+if (existsSync(frontendPath)) {
+  console.log(`Serving frontend from: ${frontendPath}`);
+  app.use(express.static(frontendPath));
+
+  // Fallback to index.html for client-side routing (SPA)
+  app.get('*', (req, res) => {
+    // Don't serve index.html for API routes
+    if (req.path.startsWith('/api')) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+    res.sendFile(join(frontendPath, 'index.html'));
+  });
+} else {
+  console.warn(`Frontend not found at: ${frontendPath}`);
+  console.warn('API-only mode: Frontend must be served separately');
+}
 
 // WebSocket connection handler
 wss.on('connection', (ws: WebSocket) => {
