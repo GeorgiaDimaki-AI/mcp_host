@@ -14,6 +14,7 @@ import { WebviewRenderer } from '../Webview/WebviewRenderer';
 import { ElicitationDialog, ElicitationRequest } from '../Elicitation/ElicitationDialog';
 import { MCPServerSettings } from '../Settings/MCPServerSettings';
 import { ChatSummary } from './ChatSummary';
+import { useMCPConfig } from '../../contexts/MCPConfigContext';
 
 const wsService = new WebSocketService('ws://localhost:3000');
 
@@ -36,6 +37,15 @@ export function Chat() {
   // Settings state
   const [showSettings, setShowSettings] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
+
+  // MCP configuration context
+  const { getTrustLevel, reload: reloadMcpConfig } = useMCPConfig();
+
+  // Handle settings close - reload MCP config in case it was updated
+  const handleSettingsClose = () => {
+    setShowSettings(false);
+    reloadMcpConfig(); // Reload trust levels after settings change
+  };
 
   // Initialize WebSocket connection
   useEffect(() => {
@@ -307,6 +317,9 @@ Use webviews when it makes sense - for collecting data, showing visualizations, 
       const result = await mcpApi.callTool(serverName, toolName, args);
 
       if (result.hasWebview && result.webviewHtml && result.webviewType) {
+        // Get trust level for this MCP server
+        const trustLevel = getTrustLevel(serverName);
+
         // Create MCP webview display - does NOT go into chat history
         const mcpWebview: MCPWebviewDisplay = {
           id: 'mcp-' + Date.now(),
@@ -319,6 +332,7 @@ Use webviews when it makes sense - for collecting data, showing visualizations, 
             source: 'mcp',
             mcpServer: serverName,
             mcpTool: toolName,
+            trustLevel, // CRITICAL-3 FIX: Include trust level
           },
           onResponse: (data) => {
             console.log(`MCP tool ${toolName} received:`, data);
@@ -732,7 +746,7 @@ Use webviews when it makes sense - for collecting data, showing visualizations, 
       {/* MCP Server Settings */}
       <MCPServerSettings
         isOpen={showSettings}
-        onClose={() => setShowSettings(false)}
+        onClose={handleSettingsClose}
       />
 
       {/* Chat Summary */}

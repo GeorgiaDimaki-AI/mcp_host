@@ -3,7 +3,7 @@
  * Renders HTML content in a sandboxed iframe
  */
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { WebviewContent, TrustLevel } from '../../types';
 import { sanitizeHTML, getSandboxAttribute, getTrustBadge } from '../../utils/htmlSanitizer';
 
@@ -27,6 +27,19 @@ export function WebviewRenderer({ content, onMessage }: WebviewRendererProps) {
     return sanitizeHTML(content.html, { trustLevel });
   }, [content.html, trustLevel]);
 
+  // Get CSP based on trust level
+  const cspPolicy = useMemo(() => {
+    const basePolicy = "default-src 'none'; style-src 'unsafe-inline'; img-src https: data:; font-src data:;";
+
+    if (trustLevel === 'unverified') {
+      // Unverified: No scripts, no forms, no network connections
+      return basePolicy;
+    } else {
+      // Trusted/Verified: Allow inline scripts (needed for sendToHost) and forms
+      return basePolicy + " script-src 'unsafe-inline'; connect-src http://localhost:*; form-action 'self';";
+    }
+  }, [trustLevel]);
+
   // Build the complete HTML document
   const htmlDocument = useMemo(() => {
     return `<!DOCTYPE html>
@@ -35,7 +48,7 @@ export function WebviewRenderer({ content, onMessage }: WebviewRendererProps) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- Content Security Policy for iframe security -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src https: data:; font-src data:; connect-src http://localhost:*; form-action 'self';">
+    <meta http-equiv="Content-Security-Policy" content="${cspPolicy}">
     <style>
       * {
         margin: 0;
@@ -103,9 +116,16 @@ export function WebviewRenderer({ content, onMessage }: WebviewRendererProps) {
     ` : ''}
   </body>
 </html>`;
-  }, [sanitizedHTML, trustLevel, parentOrigin]);
+  }, [sanitizedHTML, trustLevel, parentOrigin, cspPolicy]);
+
+  // Store onMessage callback in a ref to avoid re-registering listener
+  const onMessageRef = useRef(onMessage);
+  useEffect(() => {
+    onMessageRef.current = onMessage;
+  }, [onMessage]);
 
   // Listen for messages from iframe with origin validation
+  // Using ref to avoid memory leak from frequent listener re-registration
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       // SECURITY: Validate message origin to prevent external eavesdropping
@@ -115,14 +135,14 @@ export function WebviewRenderer({ content, onMessage }: WebviewRendererProps) {
       }
 
       // Process valid messages
-      if (event.data?.type === 'webview-message' && onMessage) {
-        onMessage(event.data.data);
+      if (event.data?.type === 'webview-message' && onMessageRef.current) {
+        onMessageRef.current(event.data.data);
       }
     };
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [onMessage]);
+  }, []); // Empty deps - listener registered once and uses ref for latest callback
 
   return (
     <div className="relative">
