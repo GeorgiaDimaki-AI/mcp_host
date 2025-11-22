@@ -83,4 +83,8 @@ export interface MCPWebviewDisplay {
   webview: WebviewContent;
   timestamp: number;
   onResponse?: (data: any) => void;
+  // Additional fields for rendering
+  mcpServer?: string;
+  mcpTool?: string;
+  trustLevel?: TrustLevel;
 }
