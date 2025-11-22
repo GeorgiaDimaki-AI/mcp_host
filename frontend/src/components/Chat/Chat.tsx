@@ -385,6 +385,7 @@ Use webviews when it makes sense - for collecting data, showing visualizations, 
       webview: {
         type: 'form',
         source: 'chat',
+        trustLevel: 'trusted',
         html: `
           <form id="demoForm">
             <label>Full Name:</label>
@@ -434,6 +435,7 @@ Use webviews when it makes sense - for collecting data, showing visualizations, 
       webview: {
         type: 'result',
         source: 'chat',
+        trustLevel: 'trusted',
         html: `
           <div style="padding: 16px;">
             <h3 style="margin: 0 0 16px 0; color: #1f2937;">Monthly Sales Report</h3>
@@ -500,6 +502,7 @@ Use webviews when it makes sense - for collecting data, showing visualizations, 
       webview: {
         type: 'html',
         source: 'chat',
+        trustLevel: 'trusted',
         html: `
           <div style="max-width: 320px; margin: 0 auto; padding: 16px;">
             <h3 style="margin: 0 0 16px 0; text-align: center; color: #1f2937;">Simple Calculator</h3>
