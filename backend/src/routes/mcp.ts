@@ -123,7 +123,9 @@ export function createMCPRouter(mcpService: MCPService) {
 
       // Return appropriate error message
       const errorMessage = error instanceof Error ? error.message : 'Failed to submit elicitation data';
-      const statusCode = errorMessage.includes('expired') || errorMessage.includes('Invalid') ? 400 : 500;
+      const statusCode = errorMessage.includes('expired') ||
+                         errorMessage.includes('Invalid') ||
+                         errorMessage.includes('already used') ? 400 : 500;
 
       res.status(statusCode).json({
         error: errorMessage,
