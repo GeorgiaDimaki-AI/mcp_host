@@ -6,8 +6,9 @@
 import { Router } from 'express';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { MCPService } from '../services/mcp.js';
+import { CertificateService } from '../services/certificate.js';
 
-export function createMCPRouter(mcpService: MCPService) {
+export function createMCPRouter(mcpService: MCPService, certificateService?: CertificateService) {
   const router = Router();
 
   /**
@@ -181,6 +182,122 @@ export function createMCPRouter(mcpService: MCPService) {
       res.status(500).json({ error: 'Failed to write MCP configuration' });
     }
   });
+
+  // Certificate management routes
+  if (certificateService) {
+    /**
+     * Get all certificates
+     */
+    router.get('/certificates', (req, res) => {
+      try {
+        const certificates = certificateService.getAllCertificates();
+        res.json({ certificates });
+      } catch (error) {
+        console.error('Error getting certificates:', error);
+        res.status(500).json({ error: 'Failed to get certificates' });
+      }
+    });
+
+    /**
+     * Get certificate for a specific server
+     */
+    router.get('/certificates/:serverName', (req, res) => {
+      try {
+        const { serverName } = req.params;
+        const certificate = certificateService.getCertificate(serverName);
+
+        if (!certificate) {
+          return res.status(404).json({ error: 'Certificate not found' });
+        }
+
+        res.json({ certificate });
+      } catch (error) {
+        console.error('Error getting certificate:', error);
+        res.status(500).json({ error: 'Failed to get certificate' });
+      }
+    });
+
+    /**
+     * Trust a certificate
+     */
+    router.post('/certificates/:serverName/trust', (req, res) => {
+      try {
+        const { serverName } = req.params;
+        const certificate = certificateService.trustCertificate(serverName);
+
+        if (!certificate) {
+          return res.status(404).json({ error: 'Certificate not found' });
+        }
+
+        res.json({
+          success: true,
+          message: `Certificate for ${serverName} is now trusted`,
+          certificate,
+        });
+      } catch (error) {
+        console.error('Error trusting certificate:', error);
+        res.status(500).json({ error: 'Failed to trust certificate' });
+      }
+    });
+
+    /**
+     * Untrust a certificate
+     */
+    router.post('/certificates/:serverName/untrust', (req, res) => {
+      try {
+        const { serverName } = req.params;
+        const certificate = certificateService.untrustCertificate(serverName);
+
+        if (!certificate) {
+          return res.status(404).json({ error: 'Certificate not found' });
+        }
+
+        res.json({
+          success: true,
+          message: `Certificate for ${serverName} is now untrusted`,
+          certificate,
+        });
+      } catch (error) {
+        console.error('Error untrusting certificate:', error);
+        res.status(500).json({ error: 'Failed to untrust certificate' });
+      }
+    });
+
+    /**
+     * Delete a certificate
+     */
+    router.delete('/certificates/:serverName', (req, res) => {
+      try {
+        const { serverName } = req.params;
+        const deleted = certificateService.removeCertificate(serverName);
+
+        if (!deleted) {
+          return res.status(404).json({ error: 'Certificate not found' });
+        }
+
+        res.json({
+          success: true,
+          message: `Certificate for ${serverName} has been removed`,
+        });
+      } catch (error) {
+        console.error('Error deleting certificate:', error);
+        res.status(500).json({ error: 'Failed to delete certificate' });
+      }
+    });
+
+    /**
+     * Get all certificate authorities
+     */
+    router.get('/certificate-authorities', (req, res) => {
+      try {
+        const authorities = certificateService.getAllCertificateAuthorities();
+        res.json({ authorities });
+      } catch (error) {
+        console.error('Error getting certificate authorities:', error);
+        res.status(500).json({ error: 'Failed to get certificate authorities' });
+      }
+    });
+  }
 
   return router;
 }

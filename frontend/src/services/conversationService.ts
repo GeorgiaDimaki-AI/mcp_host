@@ -9,6 +9,7 @@ export interface ModelSettings {
   temperature?: number;
   top_p?: number;
   top_k?: number;
+  systemPrompt?: string;
 }
 
 export interface Conversation {
@@ -19,6 +20,7 @@ export interface Conversation {
   messages: Message[];
   model: string;
   settings: ModelSettings;
+  mcpServer?: string; // Selected MCP server for this conversation
 }
 
 const STORAGE_KEY = 'mcp_conversations';

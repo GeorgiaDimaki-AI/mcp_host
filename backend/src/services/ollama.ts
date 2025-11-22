@@ -19,10 +19,20 @@ export interface OllamaGenerateRequest {
   };
 }
 
+export interface OllamaTool {
+  type: 'function';
+  function: {
+    name: string;
+    description: string;
+    parameters: any;
+  };
+}
+
 export interface OllamaChatRequest {
   model: string;
   messages: OllamaMessage[];
   stream?: boolean;
+  tools?: OllamaTool[];
   options?: {
     temperature?: number;
     top_p?: number;

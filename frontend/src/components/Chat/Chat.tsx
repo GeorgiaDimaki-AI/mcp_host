@@ -17,6 +17,7 @@ import { ChatSummary } from './ChatSummary';
 import { Sidebar } from '../Sidebar/Sidebar';
 import { ModelSettings } from '../Settings/ModelSettings';
 import { ModelManager } from '../Settings/ModelManager';
+import { HelpModal } from '../HelpModal/HelpModal';
 import { useMCPConfig } from '../../contexts/MCPConfigContext';
 import {
   getAllConversations,
@@ -43,16 +44,18 @@ export function Chat() {
   const messages = currentConversation?.messages || [];
   const currentModel = currentConversation?.model || 'llama3.2';
   const modelSettings = currentConversation?.settings || {};
+  const currentMcpServer = currentConversation?.mcpServer || '';
 
   const [isLoading, setIsLoading] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [availableMcpServers, setAvailableMcpServers] = useState<string[]>([]);
   const [streamingContent, setStreamingContent] = useState('');
 
   // MCP-specific state
   const [mcpWebviews, setMcpWebviews] = useState<MCPWebviewDisplay[]>([]);
   const [mcpTools, setMcpTools] = useState<MCPTool[]>([]);
-  const [showMcpTools, setShowMcpTools] = useState(false);
+  const [showMcpInfo, setShowMcpInfo] = useState(false);
 
   // Elicitation state
   const [activeElicitation, setActiveElicitation] = useState<ElicitationRequest | null>(null);
@@ -62,6 +65,7 @@ export function Chat() {
   const [showModelSettings, setShowModelSettings] = useState(false);
   const [showModelManager, setShowModelManager] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
+  const [showHelpModal, setShowHelpModal] = useState(false);
 
   // MCP configuration context
   const { getTrustLevel, reload: reloadMcpConfig } = useMCPConfig();
@@ -97,6 +101,7 @@ export function Chat() {
       messages,
       model: currentModel,
       settings: modelSettings,
+      mcpServer: currentMcpServer,
     });
 
     if (updated) {
@@ -129,13 +134,17 @@ export function Chat() {
     // Load available models
     loadModels();
 
-    // Load MCP tools
+    // Load MCP tools and servers
     mcpApi.listTools()
       .then((tools) => {
         setMcpTools(tools);
         if (tools.length > 0) {
           console.log(`Loaded ${tools.length} MCP tool(s)`);
         }
+
+        // Extract unique server names from tools
+        const serverNames = Array.from(new Set(tools.map(t => t.serverName)));
+        setAvailableMcpServers(serverNames);
       })
       .catch((error) => {
         console.error('Failed to load MCP tools:', error);
@@ -317,76 +326,86 @@ export function Chat() {
         content: msg.content,
       }));
 
-    // Add system prompt at the beginning to teach LLM about webviews
-    const systemPrompt = {
-      role: 'system' as const,
-      content: `You are a helpful AI assistant with the ability to render interactive HTML content.
+    // Add system prompt at the beginning
+    // Use custom system prompt from settings, or default assistant prompt
+    const webviewInstructions = `
 
-CRITICAL INSTRUCTION: When the user asks you to create HTML content, forms, charts, calculators, or any interactive UI, you MUST use the webview syntax below. Do NOT provide plain HTML code blocks.
+---
+🔴 CRITICAL WEBVIEW RENDERING RULE - READ CAREFULLY 🔴
 
-WEBVIEW SYNTAX (REQUIRED):
-\`\`\`webview:type
-<html content here>
+When the user asks for HTML content, forms, charts, calculators, or interactive UIs, you MUST ONLY respond using MARKDOWN CODE BLOCKS with the webview:type syntax.
+
+⛔ NEVER EVER output raw HTML tags directly ⛔
+⛔ NEVER use <webview> tags ⛔
+⛔ NEVER write <div>, <form>, <html> outside of code blocks ⛔
+
+✅ ONLY CORRECT FORMAT (with triple backticks):
+\`\`\`webview:html
+<div>Your HTML here</div>
 \`\`\`
 
-Available webview types:
-- webview:form - For interactive forms that collect user input
-- webview:result - For displaying data, tables, charts, or results
-- webview:html - For general HTML content, calculators, games, etc.
+📋 STEP-BY-STEP FOR CREATING HTML:
 
-CORRECT EXAMPLES:
+Step 1: Write three backticks followed by "webview:html" (or webview:form or webview:result)
+Step 2: Press Enter and write your HTML code
+Step 3: Close with three backticks
 
-1. Form example:
+Example - Simple button:
+\`\`\`webview:html
+<button onclick="alert('Hello!')">Click me</button>
+\`\`\`
+
+Example - Form:
 \`\`\`webview:form
-<form id="myForm">
-  <label>Name:</label>
-  <input type="text" name="name" required />
+<form id="f">
+  <input type="text" name="email" placeholder="Email" required />
   <button type="submit">Submit</button>
 </form>
 <script>
-document.getElementById('myForm').addEventListener('submit', function(e) {
-  e.preventDefault();
-  window.sendToHost({ type: 'form-submit', formData: { name: e.target.name.value } });
-});
+  document.getElementById('f').addEventListener('submit', function(e) {
+    e.preventDefault();
+    window.sendToHost({ type: 'form-submit', formData: { email: e.target.email.value } });
+  });
 </script>
 \`\`\`
 
-2. Chart/visualization example:
+Example - Chart/Visualization:
 \`\`\`webview:result
-<div id="chart" style="width: 100%; height: 300px;">
-  <canvas id="myChart"></canvas>
+<div style="width: 100%; height: 300px;">
+  <canvas id="chart"></canvas>
 </div>
 <script>
-  // Chart rendering code here
+  // Your chart code here
 </script>
 \`\`\`
 
-3. Calculator example:
-\`\`\`webview:html
-<div class="calculator">
-  <input type="text" id="display" readonly />
-  <button onclick="calculate()">Calculate</button>
-</div>
-<script>
-  function calculate() { /* logic */ }
-</script>
-\`\`\`
+🚫 FORBIDDEN PATTERNS - DO NOT USE:
+❌ <webview type="webview:html">content</webview>
+❌ <div>content</div> (without code blocks)
+❌ \`\`\`html ... \`\`\` (plain html, not webview:type)
+❌ Any HTML tags outside of code blocks
 
-WRONG - DO NOT DO THIS:
-\`\`\`html
-<form>...</form>
-\`\`\`
+🎯 GOLDEN RULE:
+If user asks for HTML → Use \`\`\`webview:html
+If user asks for form → Use \`\`\`webview:form
+If user asks for chart/table/viz → Use \`\`\`webview:result
+ALWAYS with triple backticks and webview:type!`;
 
-ALWAYS use webview:type syntax when creating HTML content. This is essential for proper rendering.`,
+    const systemPrompt = {
+      role: 'system' as const,
+      content: modelSettings.systemPrompt
+        ? `${modelSettings.systemPrompt}${webviewInstructions}`
+        : `You are a helpful AI assistant with the ability to render interactive HTML content.${webviewInstructions}`,
     };
 
     wsService.send({
       type: 'chat',
       messages: [systemPrompt, ...conversationMessages],
       model: currentModel,
+      mcpServer: currentMcpServer, // Send selected MCP server to enable tool calling
       options: modelSettings,
     });
-  }, [messages, currentModel, modelSettings, currentConversationId]);
+  }, [messages, currentModel, modelSettings, currentMcpServer, currentConversationId]);
 
   const handleWebviewMessage = (messageId: string, data: any) => {
     console.log('Webview message from', messageId, ':', data);
@@ -405,8 +424,12 @@ ALWAYS use webview:type syntax when creating HTML content. This is essential for
         // Remove current webview
         setMcpWebviews(prev => prev.filter(w => w.id !== messageId));
 
-        // Show system message about continuation
-        addSystemMessage(`↻ Continuing ${_tool} with collected data...`);
+        // Show collected data in chat for transparency
+        const dataEntries = Object.entries(_elicitationData || {})
+          .map(([key, value]) => `  • ${key}: ${value}`)
+          .join('\n');
+
+        addSystemMessage(`✅ Form submitted from ${mcpWebview.toolName}:\n${dataEntries}\n\n↻ Continuing tool execution...`);
 
         // Continue tool execution with collected data
         const continuationArgs = {
@@ -425,6 +448,19 @@ ALWAYS use webview:type syntax when creating HTML content. This is essential for
         return;
       }
 
+      // Check if this is a form submit with data
+      if (data.type === 'form-submit' && data.formData) {
+        // Show the submitted data in chat
+        const dataEntries = Object.entries(data.formData)
+          .filter(([key]) => !key.startsWith('_')) // Filter out internal fields
+          .map(([key, value]) => `  • ${key}: ${value}`)
+          .join('\n');
+
+        if (dataEntries) {
+          addSystemMessage(`✅ Form submitted from ${mcpWebview.toolName}:\n${dataEntries}`);
+        }
+      }
+
       if (mcpWebview.onResponse) {
         mcpWebview.onResponse(data);
       }
@@ -436,8 +472,11 @@ ALWAYS use webview:type syntax when creating HTML content. This is essential for
 
     // Regular chat webview - send back to chat as a new user message
     if (data.type === 'form-submit' && data.formData) {
-      const formDataStr = JSON.stringify(data.formData, null, 2);
-      handleSendMessage(`Form submitted with data:\n${formDataStr}`);
+      const dataEntries = Object.entries(data.formData)
+        .map(([key, value]) => `  • ${key}: ${value}`)
+        .join('\n');
+
+      addSystemMessage(`✅ Form submitted:\n${dataEntries}`);
     }
   };
 
@@ -630,17 +669,6 @@ ALWAYS use webview:type syntax when creating HTML content. This is essential for
                 Demo Calc
               </button>
 
-              {/* MCP Tools button */}
-              {mcpTools.length > 0 && (
-                <button
-                  onClick={() => setShowMcpTools(!showMcpTools)}
-                  className="px-3 py-1.5 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors font-medium"
-                  title="Show MCP tools"
-                >
-                  MCP Tools
-                </button>
-              )}
-
               {/* Model selector with settings button */}
               <div className="flex items-center gap-1">
                 <div className="relative">
@@ -682,6 +710,42 @@ ALWAYS use webview:type syntax when creating HTML content. This is essential for
                 </button>
               </div>
 
+              {/* MCP Server selector */}
+              {availableMcpServers.length > 0 && (
+                <div className="relative">
+                  <select
+                    value={currentMcpServer}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (currentConversationId) {
+                        const updated = updateConversation(currentConversationId, {
+                          mcpServer: value,
+                        });
+                        if (updated) {
+                          setConversations(prev =>
+                            prev.map(c => (c.id === currentConversationId ? updated : c))
+                          );
+                        }
+                      }
+                    }}
+                    className="appearance-none px-2 py-1 pr-6 text-xs text-gray-700 bg-gray-50 rounded border border-gray-300 hover:border-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer max-w-[140px]"
+                    title="Select MCP Server for this conversation"
+                  >
+                    <option value="">No MCP Server</option>
+                    {availableMcpServers.map((server) => (
+                      <option key={server} value={server}>
+                        MCP: {server}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none">
+                    <svg className="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
+              )}
+
               {/* Export Summary button */}
               <button
                 onClick={() => setShowSummary(true)}
@@ -694,6 +758,24 @@ ALWAYS use webview:type syntax when creating HTML content. This is essential for
                 </svg>
               </button>
 
+              {/* MCP Info button - only show when MCP server is selected */}
+              {currentMcpServer && mcpTools.length > 0 && (
+                <button
+                  onClick={() => setShowMcpInfo(!showMcpInfo)}
+                  className={`px-3 py-2 transition-colors flex items-center gap-1.5 ${
+                    showMcpInfo
+                      ? 'text-blue-600 bg-blue-50'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                  title="MCP Server Information"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="text-xs font-medium hidden xl:inline">MCP Info</span>
+                </button>
+              )}
+
               {/* MCP Server Configuration button */}
               <button
                 onClick={() => setShowMcpSettings(true)}
@@ -705,63 +787,139 @@ ALWAYS use webview:type syntax when creating HTML content. This is essential for
                 </svg>
                 <span className="text-xs font-medium hidden xl:inline">MCP</span>
               </button>
+
+              {/* Help button */}
+              <button
+                onClick={() => setShowHelpModal(true)}
+                className="px-3 py-2 text-gray-600 hover:text-gray-900 transition-colors"
+                title="MCP Developer Guide"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </button>
             </div>
           </div>
         </div>
 
-        {/* MCP Tools Panel */}
-        {showMcpTools && mcpTools.length > 0 && (
-          <div className="bg-blue-50 border-b border-blue-200 px-4 py-3">
+        {/* MCP Info Panel - Read-only information about available tools */}
+        {showMcpInfo && currentMcpServer && mcpTools.length > 0 && (
+          <div className="bg-gradient-to-r from-blue-50 to-purple-50 border-b border-blue-200 px-4 py-4">
             <div className="max-w-6xl mx-auto">
-              <div className="text-sm font-medium text-blue-900 mb-2">Available MCP Tools:</div>
-              <div className="grid grid-cols-2 gap-2">
-                {mcpTools.map(tool => (
-                  <button
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <div className="text-sm font-semibold text-blue-900">MCP Server: {currentMcpServer}</div>
+                  <div className="text-xs text-gray-600 mt-1">
+                    Ask the AI to use these tools in your conversation
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowMcpInfo(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                  title="Close"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {mcpTools.filter(t => t.serverName === currentMcpServer).map(tool => (
+                  <div
                     key={`${tool.serverName}-${tool.name}`}
-                    onClick={() => callMCPTool(tool.serverName, tool.name)}
-                    className="text-left px-3 py-2 bg-white rounded border border-blue-200 hover:border-blue-400 transition-colors"
+                    className="bg-white rounded-lg border border-blue-200 px-4 py-3 shadow-sm"
                   >
-                    <div className="font-medium text-sm text-blue-900">{tool.name}</div>
-                    <div className="text-xs text-gray-600">{tool.description}</div>
-                    <div className="text-xs text-blue-600 mt-1">Server: {tool.serverName}</div>
-                  </button>
+                    <div className="flex items-start gap-2">
+                      <div className="flex-shrink-0 mt-0.5">
+                        <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm text-gray-900">{tool.name}</div>
+                        <div className="text-xs text-gray-600 mt-1">{tool.description}</div>
+                      </div>
+                    </div>
+                  </div>
                 ))}
+              </div>
+
+              <div className="mt-3 px-4 py-2 bg-blue-100 border border-blue-300 rounded-lg">
+                <div className="text-xs text-blue-900">
+                  <strong>💡 Tip:</strong> Simply ask the AI to perform tasks, and it will use these tools automatically.
+                  For example: "Create a greeting card for me" or "Show me a data table"
+                </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* MCP Webviews Overlay */}
+        {/* MCP Webviews Overlay - Polished Design */}
         {mcpWebviews.map(webview => (
           <div
             key={webview.id}
-            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+            className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
             onClick={() => setMcpWebviews(prev => prev.filter(w => w.id !== webview.id))}
           >
             <div
-              className="bg-white rounded-lg shadow-2xl max-w-2xl w-full m-4 max-h-[80vh] overflow-auto"
+              className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[85vh] overflow-hidden flex flex-col"
               onClick={(e) => e.stopPropagation()}
             >
-              {/* Header */}
-              <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-3 flex items-center justify-between">
-                <div>
-                  <div className="font-semibold">{webview.toolName}</div>
-                  <div className="text-xs opacity-90">MCP Server: {webview.serverName}</div>
+              {/* Header - Polished with icons and better styling */}
+              <div className="bg-gradient-to-r from-blue-600 via-blue-500 to-purple-600 text-white px-6 py-4 flex items-center justify-between border-b-4 border-blue-700">
+                <div className="flex items-center gap-3">
+                  <div className="flex-shrink-0">
+                    <div className="w-10 h-10 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
+                      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                    </div>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-lg">{webview.toolName}</div>
+                    <div className="text-sm text-blue-100 flex items-center gap-1.5 mt-0.5">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
+                      </svg>
+                      <span>{webview.serverName}</span>
+                    </div>
+                  </div>
                 </div>
                 <button
                   onClick={() => setMcpWebviews(prev => prev.filter(w => w.id !== webview.id))}
-                  className="text-white hover:bg-white hover:bg-opacity-20 rounded px-2 py-1"
+                  className="text-white hover:bg-white hover:bg-opacity-25 rounded-lg p-2 transition-all duration-200"
+                  title="Close"
                 >
-                  ✕
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
                 </button>
               </div>
 
-              {/* Content */}
-              <div className="p-4">
-                <WebviewRenderer
-                  content={webview.webview}
-                  onMessage={(data) => handleWebviewMessage(webview.id, data)}
-                />
+              {/* Content - Scrollable with subtle shadow */}
+              <div className="flex-1 overflow-auto bg-gray-50">
+                <div className="p-6">
+                  <WebviewRenderer
+                    content={webview.webview}
+                    onMessage={(data) => handleWebviewMessage(webview.id, data)}
+                  />
+                </div>
+              </div>
+
+              {/* Footer with helpful info */}
+              <div className="bg-gray-100 border-t border-gray-200 px-6 py-3 flex items-center justify-between text-xs text-gray-600">
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${
+                    webview.trustLevel === 'trusted' ? 'bg-green-500' :
+                    webview.trustLevel === 'verified' ? 'bg-blue-500' :
+                    'bg-yellow-500'
+                  }`}></div>
+                  <span className="font-medium capitalize">{webview.trustLevel || 'unverified'}</span>
+                </div>
+                <div className="text-gray-500">
+                  Press ESC or click outside to close
+                </div>
               </div>
             </div>
           </div>
@@ -834,6 +992,12 @@ ALWAYS use webview:type syntax when creating HTML content. This is essential for
           onClose={() => setShowModelManager(false)}
           onModelPulled={handleModelPulled}
           installedModels={availableModels}
+        />
+
+        {/* Help Modal */}
+        <HelpModal
+          isOpen={showHelpModal}
+          onClose={() => setShowHelpModal(false)}
         />
       </div>
     </div>

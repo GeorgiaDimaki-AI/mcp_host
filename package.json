@@ -49,8 +49,12 @@
   "files": [
     "backend/dist",
     "backend/package.json",
+    "backend/mcp-config.json",
+    "backend/mcp-config.example.json",
+    "backend/certificates",
     "frontend/dist",
     "frontend/package.json",
+    "examples",
     "bin",
     "README.md",
     "docs"

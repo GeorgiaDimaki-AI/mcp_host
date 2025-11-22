@@ -110,23 +110,6 @@ export class MCPService extends EventEmitter {
       },
     });
 
-    // Handle elicitation completion notifications (for URL mode)
-    client.setNotificationHandler(
-      { method: 'notifications/elicitation/complete' } as any,
-      async (notification: any) => {
-        console.log('Elicitation completed:', notification);
-        const elicitationId = notification.params?.elicitationId;
-
-        if (elicitationId) {
-          // Emit event that frontend can listen to
-          this.emit('elicitation-complete', {
-            serverName: server.name,
-            elicitationId,
-          });
-        }
-      }
-    );
-
     // Handle elicitation requests from server
     client.setRequestHandler(
       ElicitRequestSchema,
