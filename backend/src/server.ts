@@ -13,6 +13,7 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { OllamaService, OllamaMessage } from './services/ollama.js';
 import { MCPService, MCPServer } from './services/mcp.js';
+import { CertificateService } from './services/certificate.js';
 import { createMCPRouter } from './routes/mcp.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -30,6 +31,9 @@ const DEFAULT_MODEL = process.env.DEFAULT_MODEL || 'llama3.2';
 
 // Initialize Ollama service
 const ollama = new OllamaService(OLLAMA_BASE_URL);
+
+// Initialize Certificate service
+const certificateService = new CertificateService();
 
 // Initialize MCP service
 const mcpService = new MCPService();
@@ -186,8 +190,8 @@ app.post('/api/models/pull', async (req, res) => {
   }
 });
 
-// Mount MCP routes
-app.use('/api/mcp', createMCPRouter(mcpService));
+// Mount MCP routes with certificate service
+app.use('/api/mcp', createMCPRouter(mcpService, certificateService));
 
 // Serve static files from frontend/dist
 // When running from installed package, frontend/dist is at ../../frontend/dist from server.js

@@ -5,6 +5,7 @@
 
 import { useState, useEffect } from 'react';
 import { ModelSettings as ModelSettingsType } from '../../services/conversationService';
+import { PROMPT_PRESETS, getPreset } from '../../services/promptPresets';
 
 export interface ModelSettingsProps {
   isOpen: boolean;
@@ -29,6 +30,10 @@ export function ModelSettings({
   );
   const [topP, setTopP] = useState<number>(settings.top_p ?? 0.9);
   const [topK, setTopK] = useState<number>(settings.top_k ?? 40);
+  const [systemPrompt, setSystemPrompt] = useState<string>(
+    settings.systemPrompt ?? ''
+  );
+  const [selectedPreset, setSelectedPreset] = useState<string>('custom');
 
   useEffect(() => {
     if (isOpen) {
@@ -36,6 +41,11 @@ export function ModelSettings({
       setTemperature(settings.temperature ?? 0.7);
       setTopP(settings.top_p ?? 0.9);
       setTopK(settings.top_k ?? 40);
+      setSystemPrompt(settings.systemPrompt ?? '');
+
+      // Detect if current system prompt matches a preset
+      const matchingPreset = PROMPT_PRESETS.find(p => p.prompt === settings.systemPrompt);
+      setSelectedPreset(matchingPreset ? matchingPreset.id : 'custom');
     }
   }, [isOpen, currentModel, settings]);
 
@@ -44,15 +54,30 @@ export function ModelSettings({
       temperature,
       top_p: topP,
       top_k: topK,
+      systemPrompt: systemPrompt || undefined,
     };
     onSave(selectedModel, newSettings);
     onClose();
+  };
+
+  const handlePresetChange = (presetId: string) => {
+    setSelectedPreset(presetId);
+    if (presetId === 'custom') {
+      setSystemPrompt('');
+    } else {
+      const preset = getPreset(presetId);
+      if (preset) {
+        setSystemPrompt(preset.prompt);
+      }
+    }
   };
 
   const handleReset = () => {
     setTemperature(0.7);
     setTopP(0.9);
     setTopK(40);
+    setSystemPrompt('');
+    setSelectedPreset('custom');
   };
 
   if (!isOpen) return null;
@@ -212,6 +237,58 @@ export function ModelSettings({
             <p className="text-xs text-gray-500 mt-2">
               Limits the number of highest probability tokens to consider.
               Lower values make output more focused.
+            </p>
+          </div>
+
+          {/* System Prompt Preset */}
+          <div className="border-t border-gray-200 pt-6">
+            <label
+              htmlFor="preset-select"
+              className="block text-sm font-medium text-gray-700 mb-2"
+            >
+              System Prompt Preset
+            </label>
+            <select
+              id="preset-select"
+              value={selectedPreset}
+              onChange={(e) => handlePresetChange(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="custom">Custom / None</option>
+              {PROMPT_PRESETS.map((preset) => (
+                <option key={preset.id} value={preset.id}>
+                  {preset.name}
+                </option>
+              ))}
+            </select>
+            {selectedPreset !== 'custom' && (
+              <p className="text-xs text-gray-500 mt-1">
+                {PROMPT_PRESETS.find(p => p.id === selectedPreset)?.description}
+              </p>
+            )}
+          </div>
+
+          {/* Custom System Prompt */}
+          <div>
+            <label
+              htmlFor="system-prompt"
+              className="block text-sm font-medium text-gray-700 mb-2"
+            >
+              Custom System Prompt
+            </label>
+            <textarea
+              id="system-prompt"
+              value={systemPrompt}
+              onChange={(e) => {
+                setSystemPrompt(e.target.value);
+                setSelectedPreset('custom');
+              }}
+              rows={6}
+              placeholder="Enter a custom system prompt to customize the model's behavior..."
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              The system prompt defines the model's role and behavior. Select a preset above or write your own.
             </p>
           </div>
 

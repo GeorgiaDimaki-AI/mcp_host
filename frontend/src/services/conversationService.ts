@@ -9,6 +9,7 @@ export interface ModelSettings {
   temperature?: number;
   top_p?: number;
   top_k?: number;
+  systemPrompt?: string;
 }
 
 export interface Conversation {

@@ -317,14 +317,19 @@ export function Chat() {
         content: msg.content,
       }));
 
-    // Add system prompt at the beginning to teach LLM about webviews
-    const systemPrompt = {
-      role: 'system' as const,
-      content: `You are a helpful AI assistant with the ability to render interactive HTML content.
+    // Add system prompt at the beginning
+    // Use custom system prompt from settings, or default assistant prompt
+    const webviewInstructions = `
 
-CRITICAL INSTRUCTION: When the user asks you to create HTML content, forms, charts, calculators, or any interactive UI, you MUST use the webview syntax below. Do NOT provide plain HTML code blocks.
+---
+WEBVIEW CAPABILITY:
+You have the ability to render interactive HTML content.
 
-WEBVIEW SYNTAX (REQUIRED):
+CRITICAL INSTRUCTION: When the user asks you to create HTML content, forms, charts, calculators, or any interactive UI, you MUST use the MARKDOWN CODE BLOCK syntax shown below.
+
+⚠️ IMPORTANT: DO NOT use HTML tags like <webview>, <form>, <div> directly in your response. ALWAYS wrap HTML inside markdown code blocks with the webview:type specifier.
+
+REQUIRED WEBVIEW SYNTAX (USE TRIPLE BACKTICKS):
 \`\`\`webview:type
 <html content here>
 \`\`\`
@@ -334,9 +339,9 @@ Available webview types:
 - webview:result - For displaying data, tables, charts, or results
 - webview:html - For general HTML content, calculators, games, etc.
 
-CORRECT EXAMPLES:
+✅ CORRECT EXAMPLES (note the triple backticks):
 
-1. Form example:
+1. Form example (ALWAYS use code blocks):
 \`\`\`webview:form
 <form id="myForm">
   <label>Name:</label>
@@ -351,7 +356,7 @@ document.getElementById('myForm').addEventListener('submit', function(e) {
 </script>
 \`\`\`
 
-2. Chart/visualization example:
+2. Chart/visualization example (ALWAYS use code blocks):
 \`\`\`webview:result
 <div id="chart" style="width: 100%; height: 300px;">
   <canvas id="myChart"></canvas>
@@ -361,7 +366,7 @@ document.getElementById('myForm').addEventListener('submit', function(e) {
 </script>
 \`\`\`
 
-3. Calculator example:
+3. Calculator example (ALWAYS use code blocks):
 \`\`\`webview:html
 <div class="calculator">
   <input type="text" id="display" readonly />
@@ -372,12 +377,18 @@ document.getElementById('myForm').addEventListener('submit', function(e) {
 </script>
 \`\`\`
 
-WRONG - DO NOT DO THIS:
-\`\`\`html
-<form>...</form>
-\`\`\`
+❌ WRONG - NEVER DO THIS:
+1. <webview type="webview:html">...</webview>  ← WRONG! Don't use HTML tags
+2. \`\`\`html<form>...</form>\`\`\`  ← WRONG! Missing webview:type
+3. <form>...</form>  ← WRONG! No code blocks at all
 
-ALWAYS use webview:type syntax when creating HTML content. This is essential for proper rendering.`,
+✅ REMEMBER: ALWAYS use triple backticks (\`\`\`) with webview:type when creating ANY HTML content. Never output raw HTML tags or <webview> tags directly.`;
+
+    const systemPrompt = {
+      role: 'system' as const,
+      content: modelSettings.systemPrompt
+        ? `${modelSettings.systemPrompt}${webviewInstructions}`
+        : `You are a helpful AI assistant with the ability to render interactive HTML content.${webviewInstructions}`,
     };
 
     wsService.send({
