@@ -24,6 +24,16 @@ export function sanitizeHTML(html: string, options: SanitizeOptions): string {
     return html;
   }
 
+  // Add hook to sanitize style attributes (remove javascript: protocol)
+  const hookId = DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+    if (node.hasAttribute('style')) {
+      const style = node.getAttribute('style');
+      if (style && style.toLowerCase().includes('javascript:')) {
+        node.removeAttribute('style');
+      }
+    }
+  });
+
   // Unverified MCPs: enforce static HTML with DOMPurify
   const config = {
     // Allow only safe display tags
@@ -72,7 +82,12 @@ export function sanitizeHTML(html: string, options: SanitizeOptions): string {
 
   // Sanitize with DOMPurify (returns string when RETURN_DOM is false, which is default)
   // DOMPurify will remove all forbidden tags and attributes based on config
-  return DOMPurify.sanitize(html, config) as string;
+  const result = DOMPurify.sanitize(html, config) as string;
+
+  // Remove the hook after sanitization
+  DOMPurify.removeHook('afterSanitizeAttributes');
+
+  return result;
 }
 
 /**
