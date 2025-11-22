@@ -8,7 +8,7 @@ import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync, existsSync, writeFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { OllamaService, OllamaMessage } from './services/ollama.js';
@@ -43,6 +43,15 @@ let mcpInitialized = false;
 async function initializeMCP() {
   try {
     const configPath = './mcp-config.json';
+    const exampleConfigPath = './mcp-config.example.json';
+
+    // If no config exists, copy from example
+    if (!existsSync(configPath) && existsSync(exampleConfigPath)) {
+      console.log('Creating mcp-config.json from example...');
+      const exampleConfig = readFileSync(exampleConfigPath, 'utf-8');
+      writeFileSync(configPath, exampleConfig);
+      console.log('✓ Created mcp-config.json with example webview server');
+    }
 
     if (existsSync(configPath)) {
       const configData = readFileSync(configPath, 'utf-8');

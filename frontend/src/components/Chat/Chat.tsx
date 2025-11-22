@@ -43,10 +43,12 @@ export function Chat() {
   const messages = currentConversation?.messages || [];
   const currentModel = currentConversation?.model || 'llama3.2';
   const modelSettings = currentConversation?.settings || {};
+  const currentMcpServer = currentConversation?.mcpServer || '';
 
   const [isLoading, setIsLoading] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [availableMcpServers, setAvailableMcpServers] = useState<string[]>([]);
   const [streamingContent, setStreamingContent] = useState('');
 
   // MCP-specific state
@@ -97,6 +99,7 @@ export function Chat() {
       messages,
       model: currentModel,
       settings: modelSettings,
+      mcpServer: currentMcpServer,
     });
 
     if (updated) {
@@ -129,13 +132,17 @@ export function Chat() {
     // Load available models
     loadModels();
 
-    // Load MCP tools
+    // Load MCP tools and servers
     mcpApi.listTools()
       .then((tools) => {
         setMcpTools(tools);
         if (tools.length > 0) {
           console.log(`Loaded ${tools.length} MCP tool(s)`);
         }
+
+        // Extract unique server names from tools
+        const serverNames = Array.from(new Set(tools.map(t => t.serverName)));
+        setAvailableMcpServers(serverNames);
       })
       .catch((error) => {
         console.error('Failed to load MCP tools:', error);
@@ -322,67 +329,65 @@ export function Chat() {
     const webviewInstructions = `
 
 ---
-WEBVIEW CAPABILITY:
-You have the ability to render interactive HTML content.
+🔴 CRITICAL WEBVIEW RENDERING RULE - READ CAREFULLY 🔴
 
-CRITICAL INSTRUCTION: When the user asks you to create HTML content, forms, charts, calculators, or any interactive UI, you MUST use the MARKDOWN CODE BLOCK syntax shown below.
+When the user asks for HTML content, forms, charts, calculators, or interactive UIs, you MUST ONLY respond using MARKDOWN CODE BLOCKS with the webview:type syntax.
 
-⚠️ IMPORTANT: DO NOT use HTML tags like <webview>, <form>, <div> directly in your response. ALWAYS wrap HTML inside markdown code blocks with the webview:type specifier.
+⛔ NEVER EVER output raw HTML tags directly ⛔
+⛔ NEVER use <webview> tags ⛔
+⛔ NEVER write <div>, <form>, <html> outside of code blocks ⛔
 
-REQUIRED WEBVIEW SYNTAX (USE TRIPLE BACKTICKS):
-\`\`\`webview:type
-<html content here>
+✅ ONLY CORRECT FORMAT (with triple backticks):
+\`\`\`webview:html
+<div>Your HTML here</div>
 \`\`\`
 
-Available webview types:
-- webview:form - For interactive forms that collect user input
-- webview:result - For displaying data, tables, charts, or results
-- webview:html - For general HTML content, calculators, games, etc.
+📋 STEP-BY-STEP FOR CREATING HTML:
 
-✅ CORRECT EXAMPLES (note the triple backticks):
+Step 1: Write three backticks followed by "webview:html" (or webview:form or webview:result)
+Step 2: Press Enter and write your HTML code
+Step 3: Close with three backticks
 
-1. Form example (ALWAYS use code blocks):
+Example - Simple button:
+\`\`\`webview:html
+<button onclick="alert('Hello!')">Click me</button>
+\`\`\`
+
+Example - Form:
 \`\`\`webview:form
-<form id="myForm">
-  <label>Name:</label>
-  <input type="text" name="name" required />
+<form id="f">
+  <input type="text" name="email" placeholder="Email" required />
   <button type="submit">Submit</button>
 </form>
 <script>
-document.getElementById('myForm').addEventListener('submit', function(e) {
-  e.preventDefault();
-  window.sendToHost({ type: 'form-submit', formData: { name: e.target.name.value } });
-});
+  document.getElementById('f').addEventListener('submit', function(e) {
+    e.preventDefault();
+    window.sendToHost({ type: 'form-submit', formData: { email: e.target.email.value } });
+  });
 </script>
 \`\`\`
 
-2. Chart/visualization example (ALWAYS use code blocks):
+Example - Chart/Visualization:
 \`\`\`webview:result
-<div id="chart" style="width: 100%; height: 300px;">
-  <canvas id="myChart"></canvas>
+<div style="width: 100%; height: 300px;">
+  <canvas id="chart"></canvas>
 </div>
 <script>
-  // Chart rendering code here
+  // Your chart code here
 </script>
 \`\`\`
 
-3. Calculator example (ALWAYS use code blocks):
-\`\`\`webview:html
-<div class="calculator">
-  <input type="text" id="display" readonly />
-  <button onclick="calculate()">Calculate</button>
-</div>
-<script>
-  function calculate() { /* logic */ }
-</script>
-\`\`\`
+🚫 FORBIDDEN PATTERNS - DO NOT USE:
+❌ <webview type="webview:html">content</webview>
+❌ <div>content</div> (without code blocks)
+❌ \`\`\`html ... \`\`\` (plain html, not webview:type)
+❌ Any HTML tags outside of code blocks
 
-❌ WRONG - NEVER DO THIS:
-1. <webview type="webview:html">...</webview>  ← WRONG! Don't use HTML tags
-2. \`\`\`html<form>...</form>\`\`\`  ← WRONG! Missing webview:type
-3. <form>...</form>  ← WRONG! No code blocks at all
-
-✅ REMEMBER: ALWAYS use triple backticks (\`\`\`) with webview:type when creating ANY HTML content. Never output raw HTML tags or <webview> tags directly.`;
+🎯 GOLDEN RULE:
+If user asks for HTML → Use \`\`\`webview:html
+If user asks for form → Use \`\`\`webview:form
+If user asks for chart/table/viz → Use \`\`\`webview:result
+ALWAYS with triple backticks and webview:type!`;
 
     const systemPrompt = {
       role: 'system' as const,
@@ -692,6 +697,42 @@ document.getElementById('myForm').addEventListener('submit', function(e) {
                   </svg>
                 </button>
               </div>
+
+              {/* MCP Server selector */}
+              {availableMcpServers.length > 0 && (
+                <div className="relative">
+                  <select
+                    value={currentMcpServer}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (currentConversationId) {
+                        const updated = updateConversation(currentConversationId, {
+                          mcpServer: value,
+                        });
+                        if (updated) {
+                          setConversations(prev =>
+                            prev.map(c => (c.id === currentConversationId ? updated : c))
+                          );
+                        }
+                      }
+                    }}
+                    className="appearance-none px-2 py-1 pr-6 text-xs text-gray-700 bg-gray-50 rounded border border-gray-300 hover:border-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer max-w-[140px]"
+                    title="Select MCP Server for this conversation"
+                  >
+                    <option value="">No MCP Server</option>
+                    {availableMcpServers.map((server) => (
+                      <option key={server} value={server}>
+                        MCP: {server}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none">
+                    <svg className="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
+              )}
 
               {/* Export Summary button */}
               <button

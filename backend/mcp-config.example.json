@@ -1,11 +1,11 @@
 {
   "mcpServers": {
-    "example-server": {
+    "webview-example": {
       "command": "node",
-      "args": ["path/to/your/mcp-server.js"],
-      "env": {
-        "API_KEY": "your-api-key-here"
-      }
+      "args": ["../examples/webview-example-server.js"],
+      "env": {},
+      "description": "Example MCP server demonstrating webview capabilities",
+      "trustLevel": "verified"
     }
   }
 }

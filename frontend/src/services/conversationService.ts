@@ -20,6 +20,7 @@ export interface Conversation {
   messages: Message[];
   model: string;
   settings: ModelSettings;
+  mcpServer?: string; // Selected MCP server for this conversation
 }
 
 const STORAGE_KEY = 'mcp_conversations';
