@@ -479,15 +479,15 @@ Use webviews when it makes sense - for collecting data, showing visualizations, 
 
   // Demo functions
   const sendDemoForm = () => {
-    handleSendMessage('Show me a demo form with name, email, and a submit button');
+    handleSendMessage('Create a demo form in a webview with name, email, and a submit button. Use the webview:form syntax.');
   };
 
   const sendDemoChart = () => {
-    handleSendMessage('Create a simple HTML chart showing monthly sales data');
+    handleSendMessage('Create a simple HTML chart showing monthly sales data in a webview. Use the webview:result syntax with a colorful bar chart.');
   };
 
   const sendDemoCalculator = () => {
-    handleSendMessage('Build a simple calculator using HTML, CSS, and JavaScript in a webview');
+    handleSendMessage('Build a simple calculator using HTML, CSS, and JavaScript in a webview. Use the webview:html syntax.');
   };
 
   // Conversation management functions
@@ -570,11 +570,14 @@ Use webviews when it makes sense - for collecting data, showing visualizations, 
               <h1 className="text-lg font-semibold text-gray-900">
                 {currentConversation?.title || 'LLM Webview Client'}
               </h1>
-              <span className={`px-2 py-1 text-xs rounded ${
-                isConnected ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-              }`}>
-                {isConnected ? 'Connected' : 'Disconnected'}
-              </span>
+              <div className="flex items-center gap-1.5" title={isConnected ? 'Connected' : 'Disconnected'}>
+                <div className={`w-2 h-2 rounded-full ${
+                  isConnected ? 'bg-green-500' : 'bg-red-500'
+                }`}></div>
+                <span className="text-xs text-gray-600">
+                  {isConnected ? 'Connected' : 'Disconnected'}
+                </span>
+              </div>
             </div>
 
             <div className="flex items-center gap-2">
@@ -622,7 +625,7 @@ Use webviews when it makes sense - for collecting data, showing visualizations, 
                         handleSaveModelSettings(value, modelSettings);
                       }
                     }}
-                    className="appearance-none px-3 py-2 pr-8 text-sm text-gray-700 bg-gray-50 rounded-lg border border-gray-300 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                    className="appearance-none px-2 py-1 pr-6 text-xs text-gray-700 bg-gray-50 rounded border border-gray-300 hover:border-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer max-w-[140px]"
                   >
                     {availableModels.map((model) => (
                       <option key={model} value={model}>
@@ -630,21 +633,21 @@ Use webviews when it makes sense - for collecting data, showing visualizations, 
                       </option>
                     ))}
                     <option value="__download__" className="text-blue-600 font-medium">
-                      ⬇ Download more models...
+                      ⬇ Download more...
                     </option>
                   </select>
-                  <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none">
-                    <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none">
+                    <svg className="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
                   </div>
                 </div>
                 <button
                   onClick={() => setShowModelSettings(true)}
-                  className="px-2 py-2 text-gray-600 hover:text-gray-900 transition-colors"
+                  className="px-1.5 py-1.5 text-gray-600 hover:text-gray-900 transition-colors"
                   title="Model Settings"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
                   </svg>
                 </button>
