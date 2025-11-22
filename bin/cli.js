@@ -81,6 +81,81 @@ function buildIfNeeded() {
   return Promise.resolve();
 }
 
+async function checkOllama() {
+  log('\n🔍 Checking for Ollama...', 'cyan');
+
+  try {
+    const response = await fetch('http://localhost:11434/api/version');
+    if (response.ok) {
+      const data = await response.json();
+      log(`✓ Ollama is running (version: ${data.version || 'unknown'})`, 'green');
+
+      // Check for available models
+      try {
+        const modelsResponse = await fetch('http://localhost:11434/api/tags');
+        if (modelsResponse.ok) {
+          const modelsData = await modelsResponse.json();
+          const models = modelsData.models || [];
+
+          if (models.length === 0) {
+            log('', 'reset');
+            log('⚠️  No models installed', 'yellow');
+            log('', 'reset');
+            log('Install a model to use chat features:', 'cyan');
+            log('  ollama pull llama3.2', 'green');
+            log('  ollama pull qwen2.5', 'green');
+            log('  ollama pull mistral', 'green');
+            log('', 'reset');
+            log('More models: https://ollama.com/library', 'cyan');
+          } else {
+            log(`✓ ${models.length} model(s) available: ${models.map(m => m.name).join(', ')}`, 'green');
+          }
+        }
+      } catch (err) {
+        // Couldn't check models, continue anyway
+      }
+
+      return true;
+    }
+  } catch (err) {
+    // Ollama not running
+  }
+
+  log('\n⚠️  Ollama is not running', 'yellow');
+  log('', 'reset');
+  log('The MCP Webview Host can still run for webview features,', 'reset');
+  log('but chat functionality requires Ollama.', 'reset');
+  log('', 'reset');
+  log('To install Ollama:', 'cyan');
+  log('', 'reset');
+
+  const platform = process.platform;
+  if (platform === 'darwin') {
+    log('  macOS:', 'bright');
+    log('    brew install ollama', 'green');
+    log('    ollama serve', 'green');
+    log('    ollama pull llama3.2', 'green');
+  } else if (platform === 'linux') {
+    log('  Linux:', 'bright');
+    log('    curl -fsSL https://ollama.com/install.sh | sh', 'green');
+    log('    ollama serve', 'green');
+    log('    ollama pull llama3.2', 'green');
+  } else if (platform === 'win32') {
+    log('  Windows:', 'bright');
+    log('    Download from https://ollama.com/download', 'green');
+    log('    Then: ollama pull llama3.2', 'green');
+  } else {
+    log('  Visit: https://ollama.com/download', 'green');
+  }
+
+  log('', 'reset');
+  log('Or visit: https://ollama.com for installation instructions', 'cyan');
+  log('', 'reset');
+  log('Continuing without Ollama (webview features only)...', 'yellow');
+
+  return false;
+}
+
 async function openBrowser(url) {
   try {
     const open = (await import('open')).default;
@@ -147,6 +222,7 @@ async function startServer() {
     log('╚════════════════════════════════════════════╝', 'cyan');
 
     await buildIfNeeded();
+    await checkOllama();
     await startServer();
   } catch (err) {
     log(`\n❌ Fatal error: ${err.message}`, 'red');

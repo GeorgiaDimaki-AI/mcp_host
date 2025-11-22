@@ -1,0 +1,23 @@
+{
+  "name": "mcp-webview-example",
+  "version": "1.0.0",
+  "description": "Example MCP server demonstrating webview capabilities",
+  "type": "module",
+  "main": "webview-example-server.js",
+  "bin": {
+    "mcp-webview-example": "./webview-example-server.js"
+  },
+  "scripts": {
+    "start": "node webview-example-server.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.22.0"
+  },
+  "keywords": [
+    "mcp",
+    "webview",
+    "example"
+  ],
+  "author": "Georgia Dimaki",
+  "license": "MIT"
+}

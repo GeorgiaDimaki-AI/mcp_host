@@ -7,11 +7,11 @@
     "mcp-webview-host": "./bin/cli.js"
   },
   "scripts": {
-    "prepare": "npm run install:all",
     "build:all": "npm run build:frontend && npm run build:backend",
     "install:all": "cd backend && npm install && cd ../frontend && npm install",
     "build:frontend": "cd frontend && npm run build",
     "build:backend": "cd backend && npm run build",
+    "prepack": "npm run install:all && npm run build:all",
     "start": "node bin/cli.js",
     "dev:backend": "cd backend && npm run dev",
     "dev:frontend": "cd frontend && npm run dev",
@@ -56,6 +56,11 @@
     "docs"
   ],
   "dependencies": {
-    "open": "^10.0.3"
+    "@modelcontextprotocol/sdk": "^1.22.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.1",
+    "express": "^4.18.2",
+    "open": "^10.0.3",
+    "ws": "^8.16.0"
   }
 }

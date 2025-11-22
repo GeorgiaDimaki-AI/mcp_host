@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "webview-example": {
+      "command": "node",
+      "args": ["./examples/webview-example-server.js"],
+      "env": {},
+      "description": "Example MCP server demonstrating webview capabilities"
+    }
+  }
+}
