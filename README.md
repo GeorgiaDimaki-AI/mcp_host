@@ -9,7 +9,7 @@ A local MCP host with integrated webview support for displaying HTML content, fo
 **Run with NPX (easiest):**
 
 ```bash
-npx mcp-webview-host
+npx @gdimaki-ai/mcp-webview-host
 ```
 
 That's it! The server will start and open in your browser automatically.
@@ -45,7 +45,7 @@ That's it! The server will start and open in your browser automatically.
 
 Just run:
 ```bash
-npx mcp-webview-host
+npx @gdimaki-ai/mcp-webview-host
 ```
 
 ### Option 2: Local Development

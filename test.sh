@@ -26,7 +26,7 @@ npx_test() {
     echo "🚀 Running NPX test..."
     echo "This will start the server from the published package"
     echo ""
-    npx mcp-webview-host
+    npx @gdimaki-ai/mcp-webview-host
 }
 
 # Full test suite

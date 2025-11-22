@@ -5,7 +5,7 @@
 The easiest way to test the package is using NPX:
 
 ```bash
-npx mcp-webview-host
+npx @gdimaki-ai/mcp-webview-host
 ```
 
 This will:
@@ -88,14 +88,14 @@ Then open http://localhost:5173
 ```bash
 # Clean install test
 npm pack
-npm install -g mcp-webview-host-0.1.0-beta.1.tgz
+npm install -g gdimaki-ai-mcp-webview-host-0.1.0-beta.1.tgz
 mcp-webview-host
 ```
 
 ### NPX Test
 ```bash
 # Test NPX distribution
-npx mcp-webview-host
+npx @gdimaki-ai/mcp-webview-host
 ```
 
 ### Security Test
@@ -115,7 +115,7 @@ npx mcp-webview-host
 ### Port Already in Use
 If port 3000 is in use:
 ```bash
-PORT=3001 mcp-webview-host
+PORT=3001 npx @gdimaki-ai/mcp-webview-host
 ```
 
 ### Ollama Not Running
