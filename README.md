@@ -14,6 +14,8 @@ npx mcp-webview-host
 
 That's it! The server will start and open in your browser automatically.
 
+**Want to test it?** See [TESTING.md](./TESTING.md) or run `./test.sh` for interactive testing options.
+
 ## Features
 
 - 🔌 **Full MCP Protocol Support** - Tools, resources, prompts, and elicitation
