@@ -433,7 +433,7 @@ describe('Sidebar', () => {
       fireEvent.click(deleteButton);
 
       const confirmButton = screen.getByLabelText('Confirm delete conversation');
-      expect(confirmButton).toHaveAttribute('title', 'Click again to confirm');
+      expect(confirmButton).toHaveAttribute('title', 'Click to confirm deletion');
     });
   });
 });

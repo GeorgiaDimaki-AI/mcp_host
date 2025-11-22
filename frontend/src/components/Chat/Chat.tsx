@@ -322,18 +322,21 @@ export function Chat() {
       role: 'system' as const,
       content: `You are a helpful AI assistant with the ability to render interactive HTML content.
 
-IMPORTANT: You can display interactive webviews using this syntax:
+CRITICAL INSTRUCTION: When the user asks you to create HTML content, forms, charts, calculators, or any interactive UI, you MUST use the webview syntax below. Do NOT provide plain HTML code blocks.
 
+WEBVIEW SYNTAX (REQUIRED):
 \`\`\`webview:type
 <html content here>
 \`\`\`
 
 Available webview types:
-- form: For interactive forms that collect user input
-- result: For displaying data, tables, or results
-- html: For general HTML content
+- webview:form - For interactive forms that collect user input
+- webview:result - For displaying data, tables, charts, or results
+- webview:html - For general HTML content, calculators, games, etc.
 
-Example of a form:
+CORRECT EXAMPLES:
+
+1. Form example:
 \`\`\`webview:form
 <form id="myForm">
   <label>Name:</label>
@@ -348,7 +351,33 @@ document.getElementById('myForm').addEventListener('submit', function(e) {
 </script>
 \`\`\`
 
-Use webviews when it makes sense - for collecting data, showing visualizations, or creating interactive experiences. Otherwise, just respond normally with text.`,
+2. Chart/visualization example:
+\`\`\`webview:result
+<div id="chart" style="width: 100%; height: 300px;">
+  <canvas id="myChart"></canvas>
+</div>
+<script>
+  // Chart rendering code here
+</script>
+\`\`\`
+
+3. Calculator example:
+\`\`\`webview:html
+<div class="calculator">
+  <input type="text" id="display" readonly />
+  <button onclick="calculate()">Calculate</button>
+</div>
+<script>
+  function calculate() { /* logic */ }
+</script>
+\`\`\`
+
+WRONG - DO NOT DO THIS:
+\`\`\`html
+<form>...</form>
+\`\`\`
+
+ALWAYS use webview:type syntax when creating HTML content. This is essential for proper rendering.`,
     };
 
     wsService.send({
