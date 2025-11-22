@@ -114,17 +114,31 @@ LLM never sees the data → Perfect for sensitive information
 ### Quick Start
 
 1. See complete working example: [`examples/mcp-webview-example.js`](./examples/mcp-webview-example.js)
-2. Read developer guide: [MCP_WEBVIEW_DEVELOPER_GUIDE.md](./MCP_WEBVIEW_DEVELOPER_GUIDE.md)
+2. Read developer guide: [MCP_WEBVIEW_DEVELOPER_GUIDE.md](./docs/MCP_WEBVIEW_DEVELOPER_GUIDE.md)
 3. Configure your server in `backend/mcp-config.json`
 4. Click "MCP Tools" button in the UI
 
 ## Documentation
 
-- [QUICKSTART.md](./QUICKSTART.md) - Quick start guide
-- [WEBVIEW_GUIDE.md](./WEBVIEW_GUIDE.md) - Webview usage and examples
-- [MCP_GUIDE.md](./MCP_GUIDE.md) - MCP integration overview
-- [MCP_WEBVIEW_DEVELOPER_GUIDE.md](./MCP_WEBVIEW_DEVELOPER_GUIDE.md) - **Complete guide to creating MCP servers with webviews**
+### Getting Started
+- [QUICKSTART.md](./docs/QUICKSTART.md) - Quick start guide
+- [WEBVIEW_GUIDE.md](./docs/WEBVIEW_GUIDE.md) - Webview usage and examples
+- [MCP_GUIDE.md](./docs/MCP_GUIDE.md) - MCP integration overview
+
+### MCP Development
+- [MCP_WEBVIEW_DEVELOPER_GUIDE.md](./docs/MCP_WEBVIEW_DEVELOPER_GUIDE.md) - **Complete guide to creating MCP servers with webviews**
+- [MCP_ELICITATION_GUIDE.md](./docs/MCP_ELICITATION_GUIDE.md) - Guide to MCP elicitation (form & URL modes)
+- [ELICITATION_AND_NOTIFICATIONS.md](./docs/ELICITATION_AND_NOTIFICATIONS.md) - Elicitation and notification patterns
 - [examples/mcp-webview-example.js](./examples/mcp-webview-example.js) - **Working MCP server example**
+
+### Security
+- [Phase_3_Direct_Backend_Communication_Guide.md](./docs/Phase_3_Direct_Backend_Communication_Guide.md) - **Guide for secure sensitive data submission**
+- [WEBVIEW_SECURITY_ASSESSMENT.md](./docs/WEBVIEW_SECURITY_ASSESSMENT.md) - Security architecture and analysis
+- [2025-11-21_23-53_MCP_Security_Implementation.md](./docs/2025-11-21_23-53_MCP_Security_Implementation.md) - Complete security implementation documentation
+
+### Technical Reference
+- [MCP_SPEC_COMPLIANCE_ANALYSIS.md](./docs/MCP_SPEC_COMPLIANCE_ANALYSIS.md) - MCP specification compliance
+- [EMBEDDING_ATTACK_EXPLAINED.md](./docs/EMBEDDING_ATTACK_EXPLAINED.md) - Security attack vectors explained
 
 ## Development
 

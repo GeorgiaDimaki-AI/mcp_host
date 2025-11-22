@@ -454,6 +454,6 @@ Use `window.sendToBackend()` for all sensitive data, and `window.sendToHost()` f
 ---
 
 **For more information:**
-- See `docs/2025-11-21_23-53_MCP_Security_Implementation.md` for full security architecture
-- See `docs/MCP_WEBVIEW_DEVELOPER_GUIDE.md` for general webview development
-- See `docs/WEBVIEW_SECURITY_ASSESSMENT.md` for security analysis
+- See [MCP Security Implementation](./2025-11-21_23-53_MCP_Security_Implementation.md) for full security architecture
+- See [MCP Webview Developer Guide](./MCP_WEBVIEW_DEVELOPER_GUIDE.md) for general webview development
+- See [Webview Security Assessment](./WEBVIEW_SECURITY_ASSESSMENT.md) for security analysis

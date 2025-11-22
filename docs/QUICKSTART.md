@@ -164,7 +164,7 @@ Popular models:
 ## Next Steps
 
 - Read [WEBVIEW_GUIDE.md](./WEBVIEW_GUIDE.md) to learn about webview capabilities
-- Check [README.md](./README.md) for architecture details
+- Check [README.md](../README.md) for architecture details
 - Experiment with different models
 - Build custom webviews for your use cases
 
