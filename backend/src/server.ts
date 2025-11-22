@@ -277,9 +277,19 @@ async function handleChatMessage(ws: WebSocket, message: any) {
     }));
   } catch (error) {
     console.error('Error in chat:', error);
+
+    // Provide helpful error message for connection issues
+    let errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    if (errorMessage.includes('ECONNREFUSED') || errorMessage.includes('fetch failed')) {
+      errorMessage = 'Cannot connect to Ollama. Please make sure Ollama is running:\n\n' +
+                     'Install: https://ollama.com/download\n' +
+                     'Start: ollama serve\n\n' +
+                     'The webview features will still work without Ollama.';
+    }
+
     ws.send(JSON.stringify({
       type: 'error',
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: errorMessage,
     }));
   }
 }

@@ -81,6 +81,52 @@ function buildIfNeeded() {
   return Promise.resolve();
 }
 
+async function checkOllama() {
+  log('\n🔍 Checking for Ollama...', 'cyan');
+
+  try {
+    const response = await fetch('http://localhost:11434/api/version');
+    if (response.ok) {
+      const data = await response.json();
+      log(`✓ Ollama is running (version: ${data.version || 'unknown'})`, 'green');
+      return true;
+    }
+  } catch (err) {
+    // Ollama not running
+  }
+
+  log('\n⚠️  Ollama is not running', 'yellow');
+  log('', 'reset');
+  log('The MCP Webview Host can still run for webview features,', 'reset');
+  log('but chat functionality requires Ollama.', 'reset');
+  log('', 'reset');
+  log('To install Ollama:', 'cyan');
+  log('', 'reset');
+
+  const platform = process.platform;
+  if (platform === 'darwin') {
+    log('  macOS:', 'bright');
+    log('    brew install ollama', 'green');
+    log('    ollama serve', 'green');
+  } else if (platform === 'linux') {
+    log('  Linux:', 'bright');
+    log('    curl -fsSL https://ollama.com/install.sh | sh', 'green');
+    log('    ollama serve', 'green');
+  } else if (platform === 'win32') {
+    log('  Windows:', 'bright');
+    log('    Download from https://ollama.com/download', 'green');
+  } else {
+    log('  Visit: https://ollama.com/download', 'green');
+  }
+
+  log('', 'reset');
+  log('Or visit: https://ollama.com for installation instructions', 'cyan');
+  log('', 'reset');
+  log('Continuing without Ollama (webview features only)...', 'yellow');
+
+  return false;
+}
+
 async function openBrowser(url) {
   try {
     const open = (await import('open')).default;
@@ -147,6 +193,7 @@ async function startServer() {
     log('╚════════════════════════════════════════════╝', 'cyan');
 
     await buildIfNeeded();
+    await checkOllama();
     await startServer();
   } catch (err) {
     log(`\n❌ Fatal error: ${err.message}`, 'red');
