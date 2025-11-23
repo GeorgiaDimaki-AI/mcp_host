@@ -14,6 +14,7 @@ export interface SidebarProps {
   onSelectConversation: (id: string) => void;
   onCreateConversation: () => void;
   onDeleteConversation: (id: string) => void;
+  onUpdateConversation: (id: string, updates: Partial<Conversation>) => void;
   onConversationsImported?: () => void; // Callback to refresh after import
 }
 
@@ -25,11 +26,15 @@ export function Sidebar({
   onSelectConversation,
   onCreateConversation,
   onDeleteConversation,
+  onUpdateConversation,
   onConversationsImported,
 }: SidebarProps) {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [showMenu, setShowMenu] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const editInputRef = useRef<HTMLInputElement>(null);
 
   const handleDelete = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -41,6 +46,37 @@ export function Sidebar({
       setDeleteConfirmId(id);
       // Auto-cancel after 3 seconds
       setTimeout(() => setDeleteConfirmId(null), 3000);
+    }
+  };
+
+  const handleStartEdit = (id: string, currentTitle: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingId(id);
+    setEditingTitle(currentTitle);
+    // Focus the input after state update
+    setTimeout(() => editInputRef.current?.focus(), 0);
+  };
+
+  const handleSaveEdit = (id: string) => {
+    if (editingTitle.trim()) {
+      onUpdateConversation(id, { title: editingTitle.trim() });
+    }
+    setEditingId(null);
+    setEditingTitle('');
+  };
+
+  const handleCancelEdit = () => {
+    setEditingId(null);
+    setEditingTitle('');
+  };
+
+  const handleEditKeyDown = (e: React.KeyboardEvent, id: string) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSaveEdit(id);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      handleCancelEdit();
     }
   };
 
@@ -115,15 +151,15 @@ export function Sidebar({
 
   if (isCollapsed) {
     return (
-      <div className="w-12 bg-white border-r border-gray-200 flex flex-col items-center py-4">
+      <div className="w-12 bg-background-secondary border-r border-border flex flex-col items-center py-4">
         <button
           onClick={onToggleCollapse}
-          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          className="p-2 hover:bg-surface-hover rounded-lg transition-colors"
           title="Expand sidebar"
           aria-label="Expand sidebar"
         >
           <svg
-            className="w-5 h-5 text-gray-600"
+            className="w-5 h-5 text-text-secondary"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -139,12 +175,12 @@ export function Sidebar({
 
         <button
           onClick={onCreateConversation}
-          className="mt-4 p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          className="mt-4 p-2 hover:bg-surface-hover rounded-lg transition-colors"
           title="New conversation"
           aria-label="New conversation"
         >
           <svg
-            className="w-5 h-5 text-gray-600"
+            className="w-5 h-5 text-text-secondary"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -162,18 +198,18 @@ export function Sidebar({
   }
 
   return (
-    <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
+    <div className="w-64 bg-background-secondary border-r border-border flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-200">
-        <h2 className="text-lg font-semibold text-gray-900">Conversations</h2>
+      <div className="flex items-center justify-between p-4 border-b border-border">
+        <h2 className="text-lg font-semibold text-text-primary">Conversations</h2>
         <button
           onClick={onToggleCollapse}
-          className="p-1 hover:bg-gray-100 rounded transition-colors"
+          className="p-1 hover:bg-surface-hover rounded transition-colors"
           title="Collapse sidebar"
           aria-label="Collapse sidebar"
         >
           <svg
-            className="w-5 h-5 text-gray-600"
+            className="w-5 h-5 text-text-secondary"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -189,10 +225,10 @@ export function Sidebar({
       </div>
 
       {/* New Conversation Button */}
-      <div className="p-3 border-b border-gray-200">
+      <div className="p-3 border-b border-border">
         <button
           onClick={onCreateConversation}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
+          className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors font-medium"
         >
           <svg
             className="w-5 h-5"
@@ -214,7 +250,7 @@ export function Sidebar({
       {/* Conversation List */}
       <div className="flex-1 overflow-y-auto">
         {conversations.length === 0 ? (
-          <div className="p-4 text-center text-gray-500 text-sm">
+          <div className="p-4 text-center text-text-tertiary text-sm">
             No conversations yet.
             <br />
             Start a new chat!
@@ -229,30 +265,65 @@ export function Sidebar({
                   group relative px-3 py-2 mx-2 mb-1 rounded-lg cursor-pointer transition-colors
                   ${
                     currentConversationId === conv.id
-                      ? 'bg-blue-50 border border-blue-200'
-                      : 'hover:bg-gray-50 border border-transparent'
+                      ? 'bg-primary-50 border border-primary-200'
+                      : 'hover:bg-background-tertiary border border-transparent'
                   }
                 `}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
-                    <h3
-                      className={`text-sm font-medium truncate ${
-                        currentConversationId === conv.id
-                          ? 'text-blue-900'
-                          : 'text-gray-900'
-                      }`}
-                    >
-                      {conv.title}
-                    </h3>
+                    {editingId === conv.id ? (
+                      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          ref={editInputRef}
+                          type="text"
+                          value={editingTitle}
+                          onChange={(e) => setEditingTitle(e.target.value)}
+                          onKeyDown={(e) => handleEditKeyDown(e, conv.id)}
+                          onBlur={() => handleSaveEdit(conv.id)}
+                          className="text-sm font-medium px-2 py-1 border border-blue-400 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 flex-1"
+                          maxLength={50}
+                        />
+                        <button
+                          onClick={() => handleSaveEdit(conv.id)}
+                          className="p-1 hover:bg-green-100 rounded text-green-600"
+                          title="Save"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1 group/title">
+                        <h3
+                          className={`text-sm font-medium truncate flex-1 ${
+                            currentConversationId === conv.id
+                              ? 'text-primary-900'
+                              : 'text-text-primary'
+                          }`}
+                        >
+                          {conv.title}
+                        </h3>
+                        <button
+                          onClick={(e) => handleStartEdit(conv.id, conv.title, e)}
+                          className="p-1 hover:bg-surface-hover rounded opacity-0 group-hover/title:opacity-100 transition-opacity"
+                          title="Edit title"
+                        >
+                          <svg className="w-3 h-3 text-text-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                          </svg>
+                        </button>
+                      </div>
+                    )}
                     <div className="flex items-center gap-2 mt-1">
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-text-tertiary">
                         {formatDate(conv.modified)}
                       </p>
                       {conv.messages.length > 0 && (
                         <>
-                          <span className="text-xs text-gray-400">•</span>
-                          <p className="text-xs text-gray-500">
+                          <span className="text-xs text-text-tertiary">•</span>
+                          <p className="text-xs text-text-tertiary">
                             {conv.messages.length} msg
                             {conv.messages.length !== 1 ? 's' : ''}
                           </p>
@@ -260,7 +331,7 @@ export function Sidebar({
                       )}
                     </div>
                     {conv.model && (
-                      <p className="text-xs text-gray-400 mt-1 truncate">
+                      <p className="text-xs text-text-tertiary mt-1 truncate">
                         {conv.model}
                       </p>
                     )}
@@ -274,7 +345,7 @@ export function Sidebar({
                       ${
                         deleteConfirmId === conv.id
                           ? 'bg-red-500 text-white px-2 py-1 opacity-100 font-medium'
-                          : 'hover:bg-gray-200 text-gray-500 p-1'
+                          : 'hover:bg-surface-hover text-text-tertiary p-1'
                       }
                     `}
                     title={
@@ -325,7 +396,7 @@ export function Sidebar({
 
                 {/* Last message preview */}
                 {conv.messages.length > 0 && (
-                  <p className="text-xs text-gray-500 mt-2 truncate">
+                  <p className="text-xs text-text-tertiary mt-2 truncate">
                     {conv.messages[conv.messages.length - 1].content}
                   </p>
                 )}
@@ -336,20 +407,20 @@ export function Sidebar({
       </div>
 
       {/* Footer with Export/Import */}
-      <div className="p-3 border-t border-gray-200 bg-gray-50">
+      <div className="p-3 border-t border-border bg-background-tertiary">
         <div className="flex items-center justify-between">
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-text-tertiary">
             {conversations.length} conversation{conversations.length !== 1 ? 's' : ''}
           </p>
           <div className="relative">
             <button
               onClick={() => setShowMenu(!showMenu)}
-              className="p-1 hover:bg-gray-200 rounded transition-colors"
+              className="p-1 hover:bg-surface-hover rounded transition-colors"
               title="Manage conversations"
               aria-label="Manage conversations"
             >
               <svg
-                className="w-4 h-4 text-gray-600"
+                className="w-4 h-4 text-text-secondary"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -365,10 +436,10 @@ export function Sidebar({
 
             {/* Dropdown Menu */}
             {showMenu && (
-              <div className="absolute bottom-full right-0 mb-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+              <div className="absolute bottom-full right-0 mb-2 w-48 bg-background-secondary border border-border rounded-lg shadow-lg z-10">
                 <button
                   onClick={handleExport}
-                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 rounded-t-lg transition-colors flex items-center gap-2"
+                  className="w-full px-4 py-2 text-left text-sm text-text-secondary hover:bg-background-tertiary rounded-t-lg transition-colors flex items-center gap-2"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -377,15 +448,15 @@ export function Sidebar({
                 </button>
                 <button
                   onClick={handleImportClick}
-                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 rounded-b-lg transition-colors flex items-center gap-2"
+                  className="w-full px-4 py-2 text-left text-sm text-text-secondary hover:bg-background-tertiary rounded-b-lg transition-colors flex items-center gap-2"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                   </svg>
                   Import Conversations
                 </button>
-                <div className="px-4 py-2 border-t border-gray-200">
-                  <p className="text-xs text-gray-500">
+                <div className="px-4 py-2 border-t border-border">
+                  <p className="text-xs text-text-tertiary">
                     Data is stored in your browser's localStorage
                   </p>
                 </div>

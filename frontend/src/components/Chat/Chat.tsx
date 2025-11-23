@@ -588,6 +588,15 @@ ALWAYS with triple backticks and webview:type!`;
     }
   };
 
+  const handleUpdateConversation = (id: string, updates: Partial<Conversation>) => {
+    const updated = updateConversation(id, updates);
+    if (updated) {
+      setConversations(prev =>
+        prev.map(c => (c.id === id ? updated : c))
+      );
+    }
+  };
+
   const handleSaveModelSettings = (model: string, settings: ModelSettingsType) => {
     if (!currentConversationId) return;
 
@@ -627,6 +636,7 @@ ALWAYS with triple backticks and webview:type!`;
         onSelectConversation={handleSelectConversation}
         onCreateConversation={handleCreateConversation}
         onDeleteConversation={handleDeleteConversation}
+        onUpdateConversation={handleUpdateConversation}
         onConversationsImported={handleConversationsImported}
       />
 
@@ -812,14 +822,14 @@ ALWAYS with triple backticks and webview:type!`;
             <div className="max-w-6xl mx-auto">
               <div className="flex items-center justify-between mb-3">
                 <div>
-                  <div className="text-sm font-semibold text-blue-900">MCP Server: {currentMcpServer}</div>
-                  <div className="text-xs text-gray-600 mt-1">
+                  <div className="text-sm font-semibold text-primary-900">MCP Server: {currentMcpServer}</div>
+                  <div className="text-xs text-text-secondary mt-1">
                     Ask the AI to use these tools in your conversation
                   </div>
                 </div>
                 <button
                   onClick={() => setShowMcpInfo(false)}
-                  className="text-gray-500 hover:text-gray-700"
+                  className="text-text-tertiary hover:text-text-secondary"
                   title="Close"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -832,17 +842,17 @@ ALWAYS with triple backticks and webview:type!`;
                 {mcpTools.filter(t => t.serverName === currentMcpServer).map(tool => (
                   <div
                     key={`${tool.serverName}-${tool.name}`}
-                    className="bg-white rounded-lg border border-blue-200 px-4 py-3 shadow-sm"
+                    className="bg-background-secondary rounded-lg border border-primary-200 px-4 py-3 shadow-sm"
                   >
                     <div className="flex items-start gap-2">
                       <div className="flex-shrink-0 mt-0.5">
-                        <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="font-medium text-sm text-gray-900">{tool.name}</div>
-                        <div className="text-xs text-gray-600 mt-1">{tool.description}</div>
+                        <div className="font-medium text-sm text-text-primary">{tool.name}</div>
+                        <div className="text-xs text-text-secondary mt-1">{tool.description}</div>
                       </div>
                     </div>
                   </div>
@@ -902,7 +912,7 @@ ALWAYS with triple backticks and webview:type!`;
               </div>
 
               {/* Content - Scrollable with subtle shadow */}
-              <div className="flex-1 overflow-auto bg-gray-50">
+              <div className="flex-1 overflow-auto bg-background-tertiary">
                 <div className="p-6">
                   <WebviewRenderer
                     content={webview.webview}
@@ -912,7 +922,7 @@ ALWAYS with triple backticks and webview:type!`;
               </div>
 
               {/* Footer with helpful info */}
-              <div className="bg-gray-100 border-t border-gray-200 px-6 py-3 flex items-center justify-between text-xs text-gray-600">
+              <div className="bg-surface border-t border-border px-6 py-3 flex items-center justify-between text-xs text-text-secondary">
                 <div className="flex items-center gap-2">
                   <div className={`w-2 h-2 rounded-full ${
                     webview.trustLevel === 'trusted' ? 'bg-green-500' :
@@ -921,7 +931,7 @@ ALWAYS with triple backticks and webview:type!`;
                   }`}></div>
                   <span className="font-medium capitalize">{webview.trustLevel || 'unverified'}</span>
                 </div>
-                <div className="text-gray-500">
+                <div className="text-text-tertiary">
                   Press ESC or click outside to close
                 </div>
               </div>
@@ -938,10 +948,10 @@ ALWAYS with triple backticks and webview:type!`;
 
         {/* Streaming preview */}
         {streamingContent && (
-          <div className="px-4 py-2 bg-blue-50 border-t border-blue-100">
+          <div className="px-4 py-2 bg-primary-50 border-t border-primary-100">
             <div className="max-w-4xl mx-auto">
-              <div className="text-xs text-blue-600 font-medium mb-1">Assistant is typing...</div>
-              <div className="text-sm text-gray-700">{streamingContent}</div>
+              <div className="text-xs text-primary-600 font-medium mb-1">Assistant is typing...</div>
+              <div className="text-sm text-text-secondary">{streamingContent}</div>
             </div>
           </div>
         )}
