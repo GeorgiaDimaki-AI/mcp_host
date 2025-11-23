@@ -286,7 +286,7 @@ describe('ModelSettings', () => {
     it('should not call onClose when modal content clicked', () => {
       const { container } = render(<ModelSettings {...mockProps} />);
 
-      const modalContent = container.querySelector('.bg-white.rounded-lg');
+      const modalContent = container.querySelector('.bg-background-secondary.rounded-lg');
       expect(modalContent).toBeInTheDocument();
 
       fireEvent.click(modalContent!);

@@ -47,10 +47,10 @@
   --color-border: 75 85 99;                   /* rgb(75, 85, 99) - #4b5563 gray-600 */
   --color-border-dark: 107 114 128;           /* rgb(107, 114, 128) - #6b7280 gray-500 */
 
-  /* Text colors */
-  --color-text-primary: 249 250 251;          /* rgb(249, 250, 251) - #f9fafb gray-50 */
-  --color-text-secondary: 229 231 235;        /* rgb(229, 231, 235) - #e5e7eb gray-200 */
-  --color-text-tertiary: 156 163 175;         /* rgb(156, 163, 175) - #9ca3af gray-400 */
+  /* Text colors - softer whites for better dark mode experience */
+  --color-text-primary: 209 213 219;          /* rgb(209, 213, 219) - #d1d5db gray-300 (softer) */
+  --color-text-secondary: 156 163 175;        /* rgb(156, 163, 175) - #9ca3af gray-400 */
+  --color-text-tertiary: 107 114 128;         /* rgb(107, 114, 128) - #6b7280 gray-500 */
 }
 
 /* Smooth theme transitions */

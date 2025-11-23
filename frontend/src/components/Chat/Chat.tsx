@@ -244,6 +244,34 @@ export function Chat() {
           addSystemMessage(`${icon} ${notif.serverName}: ${notif.message}`);
         }
         break;
+
+      case 'tool_execution':
+        // Handle MCP tool execution results with webviews
+        const toolMsg = message as any;
+        if (toolMsg.status === 'completed' && toolMsg.result?.hasWebview) {
+          // Display webview from MCP tool result
+          const webviewMessage: Message = {
+            id: `tool-webview-${Date.now()}`,
+            role: 'assistant',
+            content: toolMsg.result.content || `Displaying result from ${toolMsg.tool}`,
+            timestamp: Date.now(),
+            webview: {
+              type: toolMsg.result.webviewType || 'html',
+              html: toolMsg.result.webviewHtml,
+              source: 'mcp' as const,
+              trustLevel: getTrustLevel(toolMsg.server) as any,
+              mcpServer: toolMsg.server,
+            },
+          };
+
+          // Get current messages from conversation to avoid stale closure
+          if (!currentConversationId) return;
+          const currentConv = conversations.find(c => c.id === currentConversationId);
+          if (currentConv) {
+            updateMessages([...currentConv.messages, webviewMessage]);
+          }
+        }
+        break;
     }
   };
 
@@ -645,11 +673,11 @@ ALWAYS with triple backticks and webview:type!`;
         {/* Header */}
         <div className="bg-background-secondary border-b border-border px-4 py-3">
           <div className="flex items-center justify-between max-w-6xl mx-auto">
-            <div className="flex items-center gap-3">
-              <h1 className="text-lg font-semibold text-text-primary">
+            <div className="flex items-center gap-3 min-w-0">
+              <h1 className="text-lg font-semibold text-text-primary truncate">
                 {currentConversation?.title || 'LLM Webview Client'}
               </h1>
-              <div className="flex items-center gap-1.5" title={isConnected ? 'Connected' : 'Disconnected'}>
+              <div className="flex items-center gap-1.5 flex-shrink-0" title={isConnected ? 'Connected' : 'Disconnected'}>
                 <div className={`w-2 h-2 rounded-full ${
                   isConnected ? 'bg-green-500' : 'bg-red-500'
                 }`}></div>

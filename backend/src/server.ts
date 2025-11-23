@@ -443,9 +443,13 @@ async function handleChatMessage(ws: WebSocket, message: any) {
           }));
 
           // Add tool result to conversation
+          // For tools with webviews, only send the text content to the LLM
+          // The webview HTML is already sent to frontend via tool_execution message
           conversationMessages.push({
             role: 'tool',
-            content: JSON.stringify(result),
+            content: result.hasWebview
+              ? `${result.content}\n\n[IMPORTANT: An interactive webview has already been displayed to the user. DO NOT generate another webview. Just acknowledge the result in plain text.]`
+              : JSON.stringify(result),
           });
 
         } catch (error) {
