@@ -221,6 +221,36 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ['amount']
         },
       },
+      {
+        name: 'process_secure_payment',
+        description: 'Process secure payment (called directly from form, bypasses chat)',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            amount: {
+              type: 'number',
+              description: 'Payment amount'
+            },
+            cardholderName: {
+              type: 'string',
+              description: 'Cardholder name'
+            },
+            cardNumber: {
+              type: 'string',
+              description: 'Card number'
+            },
+            expiry: {
+              type: 'string',
+              description: 'Expiry date'
+            },
+            cvv: {
+              type: 'string',
+              description: 'CVV code'
+            }
+          },
+          required: ['amount', 'cardholderName', 'cardNumber', 'expiry', 'cvv']
+        },
+      },
     ],
   };
 });
@@ -490,6 +520,29 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               mimeType: 'text/html',
               text: generateSecurePaymentHTML(amount),
             },
+          },
+        ],
+      };
+    }
+
+    case 'process_secure_payment': {
+      // This is called directly from the form via POST to backend
+      // Payment data never touches the chat interface
+      const { amount, cardholderName, cardNumber, expiry, cvv } = args;
+
+      // Simulate payment processing (in real app, this would call payment gateway)
+      console.log('🔒 SECURE PAYMENT PROCESSED (backend only, never logged to chat):');
+      console.log(`  Amount: $${amount}`);
+      console.log(`  Cardholder: ${cardholderName}`);
+      console.log(`  Card: ${cardNumber.replace(/\d(?=\d{4})/g, '*')}`); // Mask all but last 4
+      console.log('  ✓ Payment processed securely');
+
+      // Return success (this goes back to the form, not to chat)
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `✓ Payment of $${amount} processed successfully. Transaction ID: TXN${Date.now()}`,
           },
         ],
       };
@@ -909,37 +962,72 @@ function generateReservationFormHTML() {
     const form = document.getElementById('reservationForm');
     const submitButton = form.querySelector('button[type="submit"]');
 
-    form.addEventListener('submit', function(e) {
+    form.addEventListener('submit', async function(e) {
       e.preventDefault();
-
-      // Check if sendToHost is available
-      if (typeof window.sendToHost !== 'function') {
-        alert('Error: Unable to submit form. Please make sure the MCP server is trusted.');
-        console.error('window.sendToHost is not available');
-        return;
-      }
 
       // Disable button and show loading state
       submitButton.disabled = true;
       submitButton.innerHTML = 'Submitting... ⏳';
 
+      // Collect form data
       const formData = new FormData(e.target);
-      const data = {
-        _continueExecution: true,
-        _tool: 'make_reservation',
-        _elicitationData: {
-          confirmationNumber: 'RES' + Math.random().toString(36).substr(2, 9).toUpperCase()
-        }
+      const confirmationNumber = 'RES' + Math.random().toString(36).substr(2, 9).toUpperCase();
+
+      const reservationData = {
+        confirmationNumber: confirmationNumber
       };
-      formData.forEach((value, key) => data._elicitationData[key] = value);
+      formData.forEach((value, key) => reservationData[key] = value);
 
       try {
-        window.sendToHost({ type: 'elicitation-response', formData: data });
+        // POST directly to backend MCP endpoint
+        const response = await fetch('/api/mcp/tools/call', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            serverName: 'restaurant',
+            toolName: 'make_reservation',
+            args: {
+              _elicitationData: reservationData
+            }
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to create reservation');
+        }
+
+        const result = await response.json();
+        console.log('Reservation created:', result);
+
+        // Show success message in the form
+        submitButton.disabled = false;
+        submitButton.innerHTML = '✓ Reservation Confirmed!';
+        submitButton.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+
+        // Notify parent of success and show confirmation
+        if (typeof window.sendToHost === 'function') {
+          window.sendToHost({
+            type: 'reservation-success',
+            confirmationNumber: confirmationNumber,
+            result: result
+          });
+        }
+
+        // Optionally reload or show confirmation in same window
+        setTimeout(() => {
+          alert('Reservation confirmed! Your confirmation number is: ' + confirmationNumber);
+          form.reset();
+          submitButton.innerHTML = 'Confirm Reservation ✓';
+          submitButton.style.background = '';
+        }, 1000);
+
       } catch (error) {
         console.error('Error submitting form:', error);
         submitButton.disabled = false;
         submitButton.innerHTML = 'Confirm Reservation ✓';
-        alert('Error submitting reservation. Please try again.');
+        alert('Error creating reservation. Please try again.');
       }
     });
   </script>
@@ -1820,12 +1908,6 @@ function generateSecurePaymentHTML(amount) {
     form.addEventListener('submit', async function(e) {
       e.preventDefault();
 
-      // Check if sendToBackend is available
-      if (typeof window.sendToBackend !== 'function') {
-        showResult('error', 'Error: window.sendToBackend is not available. Make sure the MCP server is trusted.');
-        return;
-      }
-
       // Disable button and show loading state
       submitButton.disabled = true;
       submitButton.innerHTML = 'Processing securely... 🔒';
@@ -1842,15 +1924,30 @@ function generateSecurePaymentHTML(amount) {
       };
 
       try {
-        // IMPORTANT: This sends data directly to backend, bypassing chat!
-        const result = await window.sendToBackend(paymentData);
+        // IMPORTANT: POST directly to backend, bypassing chat history!
+        // This demonstrates Phase 3 security - sensitive data never touches the chat
+        const response = await fetch('/api/mcp/tools/call', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            serverName: 'restaurant',
+            toolName: 'process_secure_payment',
+            args: paymentData
+          })
+        });
 
-        if (result.success) {
-          showResult('success', '✓ Payment processed securely! Data was sent directly to backend without going through chat.');
-          form.reset();
-        } else {
-          showResult('error', '✗ Payment failed: ' + (result.error || 'Unknown error'));
+        if (!response.ok) {
+          throw new Error('Payment processing failed');
         }
+
+        const result = await response.json();
+        console.log('Payment processed (backend only):', result);
+
+        showResult('success', '✓ Payment processed securely! Data was sent directly to backend without going through chat.');
+        form.reset();
+
       } catch (error) {
         console.error('Payment error:', error);
         showResult('error', '✗ Payment error: ' + error.message);
