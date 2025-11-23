@@ -581,8 +581,13 @@ ALWAYS with triple backticks and webview:type!`;
     };
 
     try {
+      // Generate requestId for this chat request (for cancellation support)
+      const reqId = currentRequestId || `req-${Date.now()}`;
+      setCurrentRequestId(reqId);
+
       wsService.send({
         type: 'chat',
+        requestId: reqId,
         messages: [systemPrompt, ...conversationMessages],
         model: currentModel,
         mcpServer: currentMcpServer, // Send selected MCP server to enable tool calling

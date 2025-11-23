@@ -273,6 +273,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               type: 'text',
               text: `✓ Reservation confirmed for ${data.name} on ${new Date(data.date).toLocaleDateString()} at ${data.time}. Confirmation number: ${data.confirmationNumber}`,
             },
+            {
+              type: 'resource',
+              resource: {
+                uri: 'webview://reservation-confirmation',
+                mimeType: 'text/html',
+                text: generateConfirmationHTML(confirmation),
+              },
+            },
           ],
         };
       }
@@ -992,6 +1000,266 @@ function generateReservationDetailsHTML(reservation) {
       <div class="detail">
         <span class="label">Status</span>
         <span class="status">${reservation.status}</span>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+  `;
+}
+
+function generateConfirmationHTML(reservation) {
+  const formattedDate = new Date(reservation.date).toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes checkmark {
+      0% { stroke-dashoffset: 100; }
+      100% { stroke-dashoffset: 0; }
+    }
+    @keyframes celebrate {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+    body {
+      font-family: 'Lato', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      padding: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 600px;
+      width: 100%;
+      background: white;
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      animation: fadeIn 0.6s ease-out;
+    }
+    .success-header {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: white;
+      text-align: center;
+      padding: 50px 30px;
+      position: relative;
+    }
+    .checkmark-circle {
+      width: 80px;
+      height: 80px;
+      margin: 0 auto 20px;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: celebrate 0.5s ease-out 0.3s;
+    }
+    .checkmark {
+      stroke: white;
+      stroke-width: 3;
+      stroke-dasharray: 100;
+      stroke-dashoffset: 100;
+      animation: checkmark 0.5s ease-out 0.5s forwards;
+    }
+    .success-header h1 {
+      font-size: 32px;
+      margin-bottom: 10px;
+      font-weight: 700;
+    }
+    .success-header p {
+      font-size: 18px;
+      opacity: 0.95;
+    }
+    .confirmation-number {
+      background: rgba(255, 255, 255, 0.95);
+      color: #059669;
+      padding: 20px;
+      margin: 30px;
+      border-radius: 12px;
+      text-align: center;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .confirmation-number .label {
+      font-size: 14px;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    .confirmation-number .number {
+      font-size: 28px;
+      font-weight: 700;
+      color: #059669;
+      font-family: 'Courier New', monospace;
+      letter-spacing: 2px;
+    }
+    .details {
+      padding: 30px;
+    }
+    .detail-group {
+      background: #f9fafb;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .detail-row:last-child {
+      border-bottom: none;
+    }
+    .detail-label {
+      font-size: 14px;
+      color: #6b7280;
+      font-weight: 500;
+    }
+    .detail-value {
+      font-size: 16px;
+      color: #1f2937;
+      font-weight: 600;
+      text-align: right;
+    }
+    .important-note {
+      background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+      border-left: 4px solid #f59e0b;
+      padding: 16px;
+      border-radius: 8px;
+      margin: 20px 30px;
+    }
+    .important-note .icon {
+      font-size: 20px;
+      margin-right: 8px;
+    }
+    .important-note p {
+      font-size: 14px;
+      color: #92400e;
+      line-height: 1.6;
+    }
+    .footer {
+      background: #f9fafb;
+      padding: 30px;
+      text-align: center;
+      border-top: 1px solid #e5e7eb;
+    }
+    .footer h3 {
+      font-size: 20px;
+      color: #1f2937;
+      margin-bottom: 15px;
+    }
+    .footer p {
+      font-size: 14px;
+      color: #6b7280;
+      line-height: 1.8;
+    }
+    .footer .contact {
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 1px solid #e5e7eb;
+    }
+    .footer .contact p {
+      margin: 5px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="success-header">
+      <div class="checkmark-circle">
+        <svg width="50" height="50" viewBox="0 0 52 52">
+          <path class="checkmark" fill="none" d="M14 27l7 7 16-16" />
+        </svg>
+      </div>
+      <h1>🎉 Reservation Confirmed!</h1>
+      <p>Thank you, ${reservation.customerName}!</p>
+    </div>
+
+    <div class="confirmation-number">
+      <div class="label">Your Confirmation Number</div>
+      <div class="number">${reservation.confirmationNumber}</div>
+    </div>
+
+    <div class="details">
+      <div class="detail-group">
+        <div class="detail-row">
+          <span class="detail-label">📅 Date</span>
+          <span class="detail-value">${formattedDate}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">🕐 Time</span>
+          <span class="detail-value">${reservation.time}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">👥 Party Size</span>
+          <span class="detail-value">${reservation.partySize} ${reservation.partySize === 1 ? 'guest' : 'guests'}</span>
+        </div>
+        ${reservation.tablePreference && reservation.tablePreference !== 'any' ? `
+        <div class="detail-row">
+          <span class="detail-label">🪑 Table</span>
+          <span class="detail-value">${reservation.tablePreference}</span>
+        </div>
+        ` : ''}
+        ${reservation.occasion && reservation.occasion !== 'none' ? `
+        <div class="detail-row">
+          <span class="detail-label">🎊 Occasion</span>
+          <span class="detail-value">${reservation.occasion}</span>
+        </div>
+        ` : ''}
+      </div>
+
+      <div class="detail-group">
+        <div class="detail-row">
+          <span class="detail-label">📧 Email</span>
+          <span class="detail-value">${reservation.email}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">📱 Phone</span>
+          <span class="detail-value">${reservation.phone}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="important-note">
+      <p>
+        <span class="icon">💡</span>
+        <strong>Important:</strong> Please save your confirmation number <strong>${reservation.confirmationNumber}</strong>.
+        You'll need it to view, modify, or cancel your reservation.
+      </p>
+    </div>
+
+    <div class="footer">
+      <h3>We're Excited to Host You!</h3>
+      <p>
+        Our culinary team is preparing an unforgettable dining experience.<br>
+        Please arrive 10 minutes before your reservation time.
+      </p>
+
+      <div class="contact">
+        <p><strong>La Maison Élégante</strong></p>
+        <p>123 Rue de la Gastronomie, Paris 75008</p>
+        <p>📞 +33 1 2345 6789 | ✉️ reservations@lamaisonelegante.fr</p>
       </div>
     </div>
   </div>
