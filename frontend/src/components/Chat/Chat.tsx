@@ -12,6 +12,7 @@ import { MessageList } from '../MessageList/MessageList';
 import { ChatInput } from './ChatInput';
 import { WebviewRenderer } from '../Webview/WebviewRenderer';
 import { ElicitationDialog, ElicitationRequest } from '../Elicitation/ElicitationDialog';
+import { ToolApprovalDialog, ToolApprovalRequest } from '../ToolApproval/ToolApprovalDialog';
 import { MCPServerSettings } from '../Settings/MCPServerSettings';
 import { ChatSummary } from './ChatSummary';
 import { Sidebar } from '../Sidebar/Sidebar';
@@ -40,6 +41,9 @@ export function Chat() {
   // Track previous conversation to prevent cross-contamination when switching
   const previousConversationIdRef = useRef<string | null>(null);
 
+  // Ref for streaming content auto-scroll
+  const streamingContentRef = useRef<HTMLDivElement>(null);
+
   // Current conversation derived state
   const currentConversation = conversations.find(c => c.id === currentConversationId) || null;
   const messages = currentConversation?.messages || [];
@@ -60,6 +64,10 @@ export function Chat() {
 
   // Elicitation state
   const [activeElicitation, setActiveElicitation] = useState<ElicitationRequest | null>(null);
+
+  // Tool approval state
+  const [activeToolApproval, setActiveToolApproval] = useState<ToolApprovalRequest | null>(null);
+  const [approvedToolsForSession, setApprovedToolsForSession] = useState<Set<string>>(new Set());
 
   // Settings state
   const [showMcpSettings, setShowMcpSettings] = useState(false);
@@ -113,6 +121,13 @@ export function Chat() {
 
     previousConversationIdRef.current = currentConversationId;
   }, [messages, currentConversationId, currentModel, modelSettings]);
+
+  // Auto-scroll streaming content to bottom
+  useEffect(() => {
+    if (streamingContentRef.current) {
+      streamingContentRef.current.scrollTop = streamingContentRef.current.scrollHeight;
+    }
+  }, [streamingContent]);
 
   // Handle settings close - reload MCP config in case it was updated
   const handleMcpSettingsClose = () => {
@@ -187,7 +202,7 @@ export function Chat() {
     });
 
     return unsubscribe;
-  }, [streamingContent]);
+  }, [streamingContent, conversations, currentConversationId, approvedToolsForSession]);
 
   const handleWebSocketMessage = (message: WebSocketMessage) => {
     switch (message.type) {
@@ -242,6 +257,36 @@ export function Chat() {
           const notif = (message as any).notification;
           const icon = notif.type === 'success' ? '✅' : notif.type === 'error' ? '❌' : notif.type === 'warning' ? '⚠️' : 'ℹ️';
           addSystemMessage(`${icon} ${notif.serverName}: ${notif.message}`);
+        }
+        break;
+
+      case 'tool_approval_request':
+        // Handle tool approval request
+        const approvalMsg = message as any;
+        const serverName = approvalMsg.serverName;
+
+        console.log('[Tool Approval] Request received for server:', serverName, 'tool:', approvalMsg.toolName);
+        console.log('[Tool Approval] Currently approved servers:', Array.from(approvedToolsForSession));
+
+        // Check if entire server is already approved for session
+        if (approvedToolsForSession.has(serverName)) {
+          console.log('[Tool Approval] Auto-approving - server already trusted:', serverName);
+          // Auto-approve
+          wsService.send({
+            type: 'tool_approval_response',
+            requestId: approvalMsg.requestId,
+            decision: 'allow-session',
+          });
+        } else {
+          console.log('[Tool Approval] Showing approval dialog for:', serverName, '/', approvalMsg.toolName);
+          // Show approval dialog
+          setActiveToolApproval({
+            toolName: approvalMsg.toolName,
+            serverName: approvalMsg.serverName,
+            description: approvalMsg.description,
+            args: approvalMsg.args,
+            requestId: approvalMsg.requestId,
+          });
         }
         break;
 
@@ -574,6 +619,41 @@ ALWAYS with triple backticks and webview:type!`;
     setActiveElicitation(null);
   };
 
+  const handleToolApprovalResponse = (decision: 'allow-once' | 'decline' | 'allow-session') => {
+    if (!activeToolApproval) return;
+
+    const serverName = activeToolApproval.serverName;
+    console.log('[Tool Approval] User decision:', decision, 'for server:', serverName);
+
+    // If allow for session, add entire server to approved list for this conversation
+    if (decision === 'allow-session' && currentConversationId) {
+      console.log('[Tool Approval] Adding entire server to approved list:', serverName);
+      setApprovedToolsForSession(prev => {
+        const newSet = new Set([...prev, serverName]);
+        console.log('[Tool Approval] Updated approved servers:', Array.from(newSet));
+
+        // Save to conversation
+        const conversation = conversations.find(c => c.id === currentConversationId);
+        if (conversation) {
+          updateConversation(currentConversationId, {
+            approvedServers: Array.from(newSet),
+          });
+        }
+
+        return newSet;
+      });
+    }
+
+    // Send response via WebSocket
+    wsService.send({
+      type: 'tool_approval_response',
+      requestId: activeToolApproval.requestId,
+      decision,
+    });
+
+    setActiveToolApproval(null);
+  };
+
   // Demo functions
   const sendDemoForm = () => {
     handleSendMessage('Create a demo form in a webview with name, email, and a submit button. Use the webview:form syntax.');
@@ -593,10 +673,20 @@ ALWAYS with triple backticks and webview:type!`;
     const newConv = createConversation(defaultModel);
     setConversations(prev => [newConv, ...prev]);
     setCurrentConversationId(newConv.id);
+    // Clear approved servers for new conversation
+    setApprovedToolsForSession(new Set());
   };
 
   const handleSelectConversation = (id: string) => {
     setCurrentConversationId(id);
+
+    // Load approved servers for this conversation
+    const conversation = conversations.find(c => c.id === id);
+    if (conversation?.approvedServers) {
+      setApprovedToolsForSession(new Set(conversation.approvedServers));
+    } else {
+      setApprovedToolsForSession(new Set());
+    }
   };
 
   const handleDeleteConversation = (id: string) => {
@@ -671,8 +761,8 @@ ALWAYS with triple backticks and webview:type!`;
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col">
         {/* Header */}
-        <div className="bg-background-secondary border-b border-border px-4 py-3">
-          <div className="flex items-center justify-between max-w-6xl mx-auto">
+        <div className="bg-background-secondary border-b border-border">
+          <div className="flex items-center justify-between px-4 py-3">
             <div className="flex items-center gap-3 min-w-0">
               <h1 className="text-lg font-semibold text-text-primary truncate">
                 {currentConversation?.title || 'LLM Webview Client'}
@@ -691,19 +781,19 @@ ALWAYS with triple backticks and webview:type!`;
               {/* Demo buttons */}
               <button
                 onClick={sendDemoForm}
-                className="px-3 py-1.5 text-xs bg-surface text-text-secondary rounded hover:bg-surface-hover transition-colors"
+                className="px-2 py-1.5 text-[11px] bg-surface text-text-secondary rounded hover:bg-surface-hover transition-colors whitespace-nowrap"
               >
                 Demo Form
               </button>
               <button
                 onClick={sendDemoChart}
-                className="px-3 py-1.5 text-xs bg-surface text-text-secondary rounded hover:bg-surface-hover transition-colors"
+                className="px-2 py-1.5 text-[11px] bg-surface text-text-secondary rounded hover:bg-surface-hover transition-colors whitespace-nowrap"
               >
                 Demo Chart
               </button>
               <button
                 onClick={sendDemoCalculator}
-                className="px-3 py-1.5 text-xs bg-surface text-text-secondary rounded hover:bg-surface-hover transition-colors"
+                className="px-2 py-1.5 text-[11px] bg-surface text-text-secondary rounded hover:bg-surface-hover transition-colors whitespace-nowrap"
               >
                 Demo Calc
               </button>
@@ -976,10 +1066,10 @@ ALWAYS with triple backticks and webview:type!`;
 
         {/* Streaming preview */}
         {streamingContent && (
-          <div className="px-4 py-2 bg-primary-50 border-t border-primary-100">
+          <div className="px-4 py-2 bg-background-secondary border-t border-border">
             <div className="max-w-4xl mx-auto">
               <div className="text-xs text-primary-600 font-medium mb-1">Assistant is typing...</div>
-              <div className="text-sm text-text-secondary">{streamingContent}</div>
+              <div ref={streamingContentRef} className="text-sm text-text-secondary max-h-64 overflow-y-auto">{streamingContent}</div>
             </div>
           </div>
         )}
@@ -1002,6 +1092,14 @@ ALWAYS with triple backticks and webview:type!`;
           <ElicitationDialog
             request={activeElicitation}
             onResponse={handleElicitationResponse}
+          />
+        )}
+
+        {/* Tool Approval Dialog */}
+        {activeToolApproval && (
+          <ToolApprovalDialog
+            request={activeToolApproval}
+            onResponse={handleToolApprovalResponse}
           />
         )}
 

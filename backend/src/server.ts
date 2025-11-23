@@ -401,6 +401,8 @@ async function handleChatMessage(ws: WebSocket, message: any) {
       });
 
       // Execute each tool and collect results
+      let hasWebviewResult = false; // Track if any tool returned a webview
+
       for (const toolCall of toolCalls) {
         const toolName = toolCall.function.name;
         const toolArgs = toolCall.function.arguments;
@@ -415,6 +417,63 @@ async function handleChatMessage(ws: WebSocket, message: any) {
           const serverName = parts[0];
           const actualToolName = parts.slice(1).join('_');
 
+          // Get tool description from available tools
+          const mcpTools = await mcpService.listTools();
+          const toolInfo = mcpTools.find(t => t.serverName === serverName && t.name === actualToolName);
+          const toolDescription = toolInfo?.description || 'No description available';
+
+          // Request approval from user
+          const approvalRequestId = `tool-approval-${Date.now()}-${Math.random()}`;
+          ws.send(JSON.stringify({
+            type: 'tool_approval_request',
+            requestId: approvalRequestId,
+            toolName: actualToolName,
+            serverName: serverName,
+            description: toolDescription,
+            args: toolArgs,
+            timestamp: Date.now(),
+          }));
+
+          console.log(`🔐 Requesting approval for tool: ${serverName}/${actualToolName}`);
+
+          // Wait for approval response
+          const approval = await new Promise<'allow-once' | 'decline' | 'allow-session'>((resolve) => {
+            const handler = (data: Buffer) => {
+              try {
+                const response = JSON.parse(data.toString());
+                if (response.type === 'tool_approval_response' && response.requestId === approvalRequestId) {
+                  ws.off('message', handler);
+                  resolve(response.decision);
+                }
+              } catch (error) {
+                // Ignore parsing errors
+              }
+            };
+            ws.on('message', handler);
+          });
+
+          if (approval === 'decline') {
+            console.log(`❌ Tool execution declined by user: ${serverName}/${actualToolName}`);
+            ws.send(JSON.stringify({
+              type: 'tool_execution',
+              tool: actualToolName,
+              server: serverName,
+              status: 'error',
+              error: 'User declined tool execution',
+              timestamp: Date.now(),
+            }));
+
+            conversationMessages.push({
+              role: 'tool',
+              content: JSON.stringify({
+                error: 'User declined tool execution',
+                tool: toolName,
+              }),
+            });
+            continue;
+          }
+
+          console.log(`✅ Tool approved: ${serverName}/${actualToolName} (${approval})`);
           console.log(`📞 Calling tool: ${serverName}/${actualToolName}`);
           console.log(`   Arguments:`, JSON.stringify(toolArgs, null, 2));
 
@@ -441,6 +500,11 @@ async function handleChatMessage(ws: WebSocket, message: any) {
             result: result,
             timestamp: Date.now(),
           }));
+
+          // Track if this tool returned a webview
+          if (result.hasWebview) {
+            hasWebviewResult = true;
+          }
 
           // Add tool result to conversation
           // For tools with webviews, only send the text content to the LLM
@@ -474,6 +538,13 @@ async function handleChatMessage(ws: WebSocket, message: any) {
             }),
           });
         }
+      }
+
+      // If any tool returned a webview, stop the conversation loop
+      // The webview is already displayed to the user, no need for LLM follow-up
+      if (hasWebviewResult) {
+        console.log(`🎨 Webview displayed - ending conversation loop`);
+        break;
       }
 
       // Continue loop to get LLM's response with tool results
