@@ -22,6 +22,7 @@ export interface Conversation {
   model: string;
   settings: ModelSettings;
   mcpServer?: string; // Selected MCP server for this conversation
+  approvedServers?: string[]; // List of MCP servers approved for this conversation
 }
 
 const STORAGE_KEY = 'mcp_conversations';

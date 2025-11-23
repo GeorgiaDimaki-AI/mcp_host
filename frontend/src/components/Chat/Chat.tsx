@@ -615,12 +615,21 @@ ALWAYS with triple backticks and webview:type!`;
     const serverName = activeToolApproval.serverName;
     console.log('[Tool Approval] User decision:', decision, 'for server:', serverName);
 
-    // If allow for session, add entire server to approved list
-    if (decision === 'allow-session') {
+    // If allow for session, add entire server to approved list for this conversation
+    if (decision === 'allow-session' && currentConversationId) {
       console.log('[Tool Approval] Adding entire server to approved list:', serverName);
       setApprovedToolsForSession(prev => {
         const newSet = new Set([...prev, serverName]);
         console.log('[Tool Approval] Updated approved servers:', Array.from(newSet));
+
+        // Save to conversation
+        const conversation = conversations.find(c => c.id === currentConversationId);
+        if (conversation) {
+          updateConversation(currentConversationId, {
+            approvedServers: Array.from(newSet),
+          });
+        }
+
         return newSet;
       });
     }
@@ -654,10 +663,20 @@ ALWAYS with triple backticks and webview:type!`;
     const newConv = createConversation(defaultModel);
     setConversations(prev => [newConv, ...prev]);
     setCurrentConversationId(newConv.id);
+    // Clear approved servers for new conversation
+    setApprovedToolsForSession(new Set());
   };
 
   const handleSelectConversation = (id: string) => {
     setCurrentConversationId(id);
+
+    // Load approved servers for this conversation
+    const conversation = conversations.find(c => c.id === id);
+    if (conversation?.approvedServers) {
+      setApprovedToolsForSession(new Set(conversation.approvedServers));
+    } else {
+      setApprovedToolsForSession(new Set());
+    }
   };
 
   const handleDeleteConversation = (id: string) => {
