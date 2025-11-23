@@ -34,60 +34,62 @@ export function sanitizeHTML(html: string, options: SanitizeOptions): string {
     }
   });
 
-  // Unverified MCPs: enforce static HTML with DOMPurify
-  const config = {
-    // Allow only safe display tags
-    ALLOWED_TAGS: [
-      'div', 'span', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-      'table', 'thead', 'tbody', 'tr', 'td', 'th',
-      'ul', 'ol', 'li',
-      'br', 'hr',
-      'strong', 'em', 'b', 'i', 'u',
-      'code', 'pre',
-      'a', 'img',
-    ],
+  try {
+    // Unverified MCPs: enforce static HTML with DOMPurify
+    const config = {
+      // Allow only safe display tags
+      ALLOWED_TAGS: [
+        'div', 'span', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+        'table', 'thead', 'tbody', 'tr', 'td', 'th',
+        'ul', 'ol', 'li',
+        'br', 'hr',
+        'strong', 'em', 'b', 'i', 'u',
+        'code', 'pre',
+        'a', 'img',
+      ],
 
-    // Very limited attributes for styling only
-    ALLOWED_ATTR: ['class', 'style', 'href', 'src', 'alt', 'title'],
+      // Very limited attributes for styling only
+      ALLOWED_ATTR: ['class', 'style', 'href', 'src', 'alt', 'title'],
 
-    // Block all dangerous tags
-    FORBID_TAGS: ['script', 'iframe', 'embed', 'object', 'applet', 'link',
-                  'base', 'meta', 'style', 'form', 'input', 'button',
-                  'textarea', 'select', 'option'],
+      // Block all dangerous tags
+      FORBID_TAGS: ['script', 'iframe', 'embed', 'object', 'applet', 'link',
+                    'base', 'meta', 'style', 'form', 'input', 'button',
+                    'textarea', 'select', 'option'],
 
-    // Block all event handlers
-    FORBID_ATTR: ['onclick', 'onload', 'onerror', 'onmouseover', 'onmouseout',
-                  'onfocus', 'onblur', 'onchange', 'onsubmit', 'oninput'],
+      // Block all event handlers
+      FORBID_ATTR: ['onclick', 'onload', 'onerror', 'onmouseover', 'onmouseout',
+                    'onfocus', 'onblur', 'onchange', 'onsubmit', 'oninput'],
 
-    // Don't allow data attributes (can be used for XSS)
-    ALLOW_DATA_ATTR: false,
+      // Don't allow data attributes (can be used for XSS)
+      ALLOW_DATA_ATTR: false,
 
-    // Allowed protocols for links and images
-    ALLOWED_URI_REGEXP: /^(?:(?:(?:f|ht)tps?|mailto):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
+      // Allowed protocols for links and images
+      ALLOWED_URI_REGEXP: /^(?:(?:(?:f|ht)tps?|mailto):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
 
-    // Safer defaults
-    SAFE_FOR_TEMPLATES: true,
-  };
+      // Safer defaults
+      SAFE_FOR_TEMPLATES: true,
+    };
 
-  // Additional config for forms if needed
-  if (allowForms) {
-    config.ALLOWED_TAGS?.push('form', 'input', 'button', 'textarea', 'select', 'option', 'label');
-    config.ALLOWED_ATTR?.push('type', 'name', 'value', 'placeholder', 'required', 'disabled', 'readonly');
+    // Additional config for forms if needed
+    if (allowForms) {
+      config.ALLOWED_TAGS?.push('form', 'input', 'button', 'textarea', 'select', 'option', 'label');
+      config.ALLOWED_ATTR?.push('type', 'name', 'value', 'placeholder', 'required', 'disabled', 'readonly');
 
-    // Remove form tags from forbidden list
-    config.FORBID_TAGS = config.FORBID_TAGS?.filter(tag =>
-      !['form', 'input', 'button', 'textarea', 'select', 'option'].includes(tag)
-    );
+      // Remove form tags from forbidden list
+      config.FORBID_TAGS = config.FORBID_TAGS?.filter(tag =>
+        !['form', 'input', 'button', 'textarea', 'select', 'option'].includes(tag)
+      );
+    }
+
+    // Sanitize with DOMPurify (returns string when RETURN_DOM is false, which is default)
+    // DOMPurify will remove all forbidden tags and attributes based on config
+    const result = DOMPurify.sanitize(html, config) as string;
+
+    return result;
+  } finally {
+    // Bug #8: Always remove hook, even if sanitization fails
+    DOMPurify.removeHook('afterSanitizeAttributes');
   }
-
-  // Sanitize with DOMPurify (returns string when RETURN_DOM is false, which is default)
-  // DOMPurify will remove all forbidden tags and attributes based on config
-  const result = DOMPurify.sanitize(html, config) as string;
-
-  // Remove the hook after sanitization
-  DOMPurify.removeHook('afterSanitizeAttributes');
-
-  return result;
 }
 
 /**

@@ -296,7 +296,15 @@ function renderFormField(
         id={`field-${key}`}
         type="number"
         value={value || ''}
-        onChange={(e) => onChange(key, fieldSchema.type === 'integer' ? parseInt(e.target.value, 10) : parseFloat(e.target.value))}
+        onChange={(e) => {
+          // Bug #9: Validate that parsing doesn't return NaN
+          const parsed = fieldSchema.type === 'integer'
+            ? parseInt(e.target.value, 10)
+            : parseFloat(e.target.value);
+          if (!isNaN(parsed)) {
+            onChange(key, parsed);
+          }
+        }}
         required={required}
         min={fieldSchema.minimum}
         max={fieldSchema.maximum}

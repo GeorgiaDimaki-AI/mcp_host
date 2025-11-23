@@ -6,6 +6,13 @@
       "env": {},
       "description": "Example MCP server demonstrating webview capabilities",
       "trustLevel": "verified"
+    },
+    "restaurant": {
+      "command": "node",
+      "args": ["../examples/restaurant-mcp-server.js"],
+      "env": {},
+      "description": "La Maison Élégante - Beautiful restaurant booking system with webviews",
+      "trustLevel": "verified"
     }
   }
 }

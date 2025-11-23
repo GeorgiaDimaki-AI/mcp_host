@@ -72,6 +72,7 @@ export class MCPService extends EventEmitter {
   }> = new Map();
 
   private REQUEST_EXPIRATION_MS = 5 * 60 * 1000; // 5 minutes
+  private cleanupInterval?: NodeJS.Timeout;
 
   /**
    * Initialize MCP service with server configurations
@@ -85,6 +86,30 @@ export class MCPService extends EventEmitter {
       } catch (error) {
         console.error(`Failed to connect to MCP server ${server.name}:`, error);
       }
+    }
+
+    // Start periodic cleanup of expired requests (every 2 minutes)
+    this.cleanupInterval = setInterval(() => {
+      this.cleanupExpiredRequests();
+    }, 2 * 60 * 1000);
+  }
+
+  /**
+   * Clean up expired requests from activeRequests map
+   */
+  private cleanupExpiredRequests() {
+    const now = Date.now();
+    let cleanedCount = 0;
+
+    for (const [requestId, request] of this.activeRequests.entries()) {
+      if (now - request.timestamp > this.REQUEST_EXPIRATION_MS) {
+        this.activeRequests.delete(requestId);
+        cleanedCount++;
+      }
+    }
+
+    if (cleanedCount > 0) {
+      console.log(`🧹 Cleaned up ${cleanedCount} expired request(s) from activeRequests`);
     }
   }
 
@@ -206,9 +231,18 @@ export class MCPService extends EventEmitter {
 
   /**
    * Mark an operation as active (prevents duplicate requests)
+   * Auto-cleanup after 10 minutes to prevent unbounded growth
    */
   markOperationActive(operationId: string) {
     this.activeOperations.add(operationId);
+
+    // Auto-cleanup after 10 minutes in case markOperationComplete is never called
+    setTimeout(() => {
+      if (this.activeOperations.has(operationId)) {
+        console.log(`🧹 Auto-cleaning up stale operation: ${operationId}`);
+        this.activeOperations.delete(operationId);
+      }
+    }, 10 * 60 * 1000); // 10 minutes
   }
 
   /**
@@ -343,6 +377,12 @@ export class MCPService extends EventEmitter {
    * Disconnect from all servers
    */
   async disconnect() {
+    // Clear cleanup interval
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = undefined;
+    }
+
     for (const [serverName, client] of this.clients.entries()) {
       try {
         await client.close();

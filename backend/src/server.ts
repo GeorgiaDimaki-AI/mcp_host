@@ -97,6 +97,9 @@ initializeMCP();
 // Track active WebSocket connections
 const activeConnections = new Set<WebSocket>();
 
+// Track active chat requests for cancellation support
+const activeChatRequests = new Map<string, { cancelled: boolean }>();
+
 // Listen for elicitation requests from MCP service
 mcpService.on('elicitation-request', (request) => {
   console.log('Broadcasting elicitation request to all clients:', request);
@@ -246,6 +249,18 @@ wss.on('connection', (ws: WebSocket) => {
 
       if (message.type === 'chat') {
         await handleChatMessage(ws, message);
+      } else if (message.type === 'cancel') {
+        // Handle request to cancel ongoing generation
+        const { requestId } = message;
+        if (requestId && activeChatRequests.has(requestId)) {
+          console.log(`🛑 Cancelling request: ${requestId}`);
+          activeChatRequests.get(requestId)!.cancelled = true;
+          ws.send(JSON.stringify({
+            type: 'chat_cancelled',
+            requestId,
+            timestamp: Date.now(),
+          }));
+        }
       } else if (message.type === 'ping') {
         ws.send(JSON.stringify({ type: 'pong' }));
       } else if (message.type === 'elicitation-response') {
@@ -311,12 +326,18 @@ function convertMCPToolsToOllamaFormat(mcpTools: any[]): any[] {
  * Implements tool execution loop with automatic continuation until final response
  */
 async function handleChatMessage(ws: WebSocket, message: any) {
-  const { messages, model = DEFAULT_MODEL, options = {}, mcpServer } = message;
+  const { messages, model = DEFAULT_MODEL, options = {}, mcpServer, requestId } = message;
+
+  // Track this request for cancellation support
+  if (requestId) {
+    activeChatRequests.set(requestId, { cancelled: false });
+  }
 
   try {
     // Send start signal
     ws.send(JSON.stringify({
       type: 'chat_start',
+      requestId,
       timestamp: Date.now(),
     }));
 
@@ -364,6 +385,12 @@ async function handleChatMessage(ws: WebSocket, message: any) {
         tools,
         options,
       })) {
+        // Check if request was cancelled
+        if (requestId && activeChatRequests.get(requestId)?.cancelled) {
+          console.log(`🛑 Request ${requestId} cancelled - stopping generation`);
+          break;
+        }
+
         if (chunk.type === 'content') {
           // Stream content to the client
           const content = chunk.data as string;
@@ -373,6 +400,7 @@ async function handleChatMessage(ws: WebSocket, message: any) {
           ws.send(JSON.stringify({
             type: 'chat_chunk',
             content: content,
+            requestId,
             timestamp: Date.now(),
           }));
         } else if (chunk.type === 'tool_calls') {
@@ -380,8 +408,26 @@ async function handleChatMessage(ws: WebSocket, message: any) {
           hasToolCalls = true;
           toolCalls = chunk.data as OllamaToolCall[];
           console.log(`🔧 Tool calls detected: ${toolCalls.length} tool(s)`);
+
+          // Clear the streamed content from frontend since it was just "thinking" text
+          // The actual tool result will be displayed instead
+          ws.send(JSON.stringify({
+            type: 'clear_streaming',
+            timestamp: Date.now(),
+          }));
+
+          // Remove the tool-call iteration content from fullResponse
+          // since it's not the final answer
+          fullResponse = fullResponse.substring(0, fullResponse.length - iterationContent.length);
+
           break; // Stop streaming when tool calls are detected
         }
+      }
+
+      // Check if cancelled after streaming
+      if (requestId && activeChatRequests.get(requestId)?.cancelled) {
+        console.log(`🛑 Request ${requestId} cancelled - exiting tool loop`);
+        break;
       }
 
       // If no tool calls, we're done
@@ -436,20 +482,41 @@ async function handleChatMessage(ws: WebSocket, message: any) {
 
           console.log(`🔐 Requesting approval for tool: ${serverName}/${actualToolName}`);
 
-          // Wait for approval response
-          const approval = await new Promise<'allow-once' | 'decline' | 'allow-session'>((resolve) => {
+          // Wait for approval response with timeout and proper cleanup
+          const approval = await new Promise<'allow-once' | 'decline' | 'allow-session'>((resolve, reject) => {
+            const APPROVAL_TIMEOUT = 60000; // 60 seconds
+            let timeoutId: NodeJS.Timeout;
+
             const handler = (data: Buffer) => {
               try {
                 const response = JSON.parse(data.toString());
                 if (response.type === 'tool_approval_response' && response.requestId === approvalRequestId) {
+                  // Clean up handler and timeout
                   ws.off('message', handler);
+                  clearTimeout(timeoutId);
                   resolve(response.decision);
                 }
               } catch (error) {
                 // Ignore parsing errors
               }
             };
+
+            // Set up timeout to auto-decline after 60 seconds
+            timeoutId = setTimeout(() => {
+              ws.off('message', handler);
+              console.log(`⏱️  Tool approval timed out for: ${serverName}/${actualToolName}`);
+              resolve('decline');
+            }, APPROVAL_TIMEOUT);
+
+            // Register handler
             ws.on('message', handler);
+
+            // Clean up handler if WebSocket closes
+            ws.once('close', () => {
+              ws.off('message', handler);
+              clearTimeout(timeoutId);
+              reject(new Error('WebSocket closed during approval request'));
+            });
           });
 
           if (approval === 'decline') {
@@ -565,6 +632,7 @@ async function handleChatMessage(ws: WebSocket, message: any) {
     ws.send(JSON.stringify({
       type: 'chat_complete',
       fullContent: fullResponse,
+      requestId,
       timestamp: Date.now(),
     }));
 
@@ -592,7 +660,13 @@ async function handleChatMessage(ws: WebSocket, message: any) {
     ws.send(JSON.stringify({
       type: 'error',
       error: errorMessage,
+      requestId,
     }));
+  } finally {
+    // Clean up active request tracking
+    if (requestId) {
+      activeChatRequests.delete(requestId);
+    }
   }
 }
 

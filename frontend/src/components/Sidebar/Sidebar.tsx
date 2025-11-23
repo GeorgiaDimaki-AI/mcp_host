@@ -3,8 +3,14 @@
  * Displays conversation list with create, select, and delete actions
  */
 
-import React, { useState, useRef } from 'react';
-import { Conversation, exportConversations, importConversations } from '../../services/conversationService';
+import React, { useState, useRef, useMemo } from 'react';
+import {
+  Conversation,
+  exportConversations,
+  importConversations,
+  exportConversationAsJSON,
+  exportConversationAsMarkdown
+} from '../../services/conversationService';
 
 export interface SidebarProps {
   conversations: Conversation[];
@@ -33,6 +39,8 @@ export function Sidebar({
   const [showMenu, setShowMenu] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [exportMenuId, setExportMenuId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
 
@@ -100,21 +108,26 @@ export function Sidebar({
   };
 
   const handleExport = () => {
+    let url: string | null = null;
     try {
       const json = exportConversations();
       const blob = new Blob([json], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
+      url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = `conversations-${new Date().toISOString().split('T')[0]}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      URL.revokeObjectURL(url);
       setShowMenu(false);
     } catch (error) {
       console.error('Export failed:', error);
       alert('Failed to export conversations');
+    } finally {
+      // Bug #7: Always revoke URL to prevent memory leak
+      if (url) {
+        URL.revokeObjectURL(url);
+      }
     }
   };
 
@@ -148,6 +161,63 @@ export function Sidebar({
       fileInputRef.current.value = '';
     }
   };
+
+  const handleExportConversation = (conv: Conversation, format: 'json' | 'markdown', e: React.MouseEvent) => {
+    e.stopPropagation();
+    let url: string | null = null;
+    try {
+      const content = format === 'json'
+        ? exportConversationAsJSON(conv.id)
+        : exportConversationAsMarkdown(conv.id);
+
+      if (!content) {
+        alert('Failed to export conversation');
+        return;
+      }
+
+      const blob = new Blob([content], {
+        type: format === 'json' ? 'application/json' : 'text/markdown'
+      });
+      url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const sanitizedTitle = conv.title.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+      a.download = `${sanitizedTitle}.${format === 'json' ? 'json' : 'md'}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setExportMenuId(null);
+    } catch (error) {
+      console.error('Export failed:', error);
+      alert('Failed to export conversation');
+    } finally {
+      if (url) {
+        URL.revokeObjectURL(url);
+      }
+    }
+  };
+
+  // Filter conversations based on search query
+  const filteredConversations = useMemo(() => {
+    if (!searchQuery) return conversations;
+
+    const query = searchQuery.toLowerCase();
+    return conversations.filter(conv => {
+      // Search title
+      if (conv.title.toLowerCase().includes(query)) return true;
+
+      // Search message content
+      const hasMatchingMessage = conv.messages.some(msg =>
+        msg.content.toLowerCase().includes(query)
+      );
+      if (hasMatchingMessage) return true;
+
+      // Search model name
+      if (conv.model.toLowerCase().includes(query)) return true;
+
+      return false;
+    });
+  }, [conversations, searchQuery]);
 
   if (isCollapsed) {
     return (
@@ -247,6 +317,48 @@ export function Sidebar({
         </button>
       </div>
 
+      {/* Search Bar */}
+      <div className="p-3 border-b border-border">
+        <div className="relative">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search conversations..."
+            className="w-full pl-9 pr-3 py-2 text-sm border border-border rounded-lg bg-background-primary text-text-primary placeholder-text-tertiary focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+          />
+          <svg
+            className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-tertiary"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+            />
+          </svg>
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-surface-hover rounded transition-colors"
+              title="Clear search"
+            >
+              <svg className="w-4 h-4 text-text-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
+        </div>
+        {searchQuery && (
+          <div className="mt-2 text-xs text-text-secondary">
+            {filteredConversations.length} of {conversations.length} conversation{conversations.length !== 1 ? 's' : ''}
+          </div>
+        )}
+      </div>
+
       {/* Conversation List */}
       <div className="flex-1 overflow-y-auto">
         {conversations.length === 0 ? (
@@ -255,9 +367,20 @@ export function Sidebar({
             <br />
             Start a new chat!
           </div>
+        ) : filteredConversations.length === 0 ? (
+          <div className="p-4 text-center text-text-tertiary text-sm">
+            No conversations match "{searchQuery}"
+            <br />
+            <button
+              onClick={() => setSearchQuery('')}
+              className="mt-2 text-primary-600 hover:text-primary-700 text-xs"
+            >
+              Clear search
+            </button>
+          </div>
         ) : (
           <div className="py-2">
-            {conversations.map((conv) => (
+            {filteredConversations.map((conv) => (
               <div
                 key={conv.id}
                 onClick={() => onSelectConversation(conv.id)}
@@ -337,30 +460,84 @@ export function Sidebar({
                     )}
                   </div>
 
-                  {/* Delete Button */}
-                  <button
-                    onClick={(e) => handleDelete(conv.id, e)}
-                    className={`
-                      flex-shrink-0 rounded transition-all opacity-0 group-hover:opacity-100 flex items-center gap-1
-                      ${
+                  <div className="flex items-center gap-1">
+                    {/* Export Button */}
+                    <div className="relative">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setExportMenuId(exportMenuId === conv.id ? null : conv.id);
+                        }}
+                        className="flex-shrink-0 rounded hover:bg-surface-hover text-text-tertiary p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Export conversation"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                      </button>
+
+                      {/* Export Dropdown */}
+                      {exportMenuId === conv.id && (
+                        <div
+                          className="absolute bottom-full right-0 mb-1 w-32 bg-background-secondary border border-border rounded-lg shadow-lg z-10"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <button
+                            onClick={(e) => handleExportConversation(conv, 'json', e)}
+                            className="w-full px-3 py-2 text-left text-xs text-text-secondary hover:bg-background-tertiary rounded-t-lg transition-colors"
+                          >
+                            Export as JSON
+                          </button>
+                          <button
+                            onClick={(e) => handleExportConversation(conv, 'markdown', e)}
+                            className="w-full px-3 py-2 text-left text-xs text-text-secondary hover:bg-background-tertiary rounded-b-lg transition-colors"
+                          >
+                            Export as MD
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Delete Button */}
+                    <button
+                      onClick={(e) => handleDelete(conv.id, e)}
+                      className={`
+                        flex-shrink-0 rounded transition-all opacity-0 group-hover:opacity-100 flex items-center gap-1
+                        ${
+                          deleteConfirmId === conv.id
+                            ? 'bg-red-500 text-white px-2 py-1 opacity-100 font-medium'
+                            : 'hover:bg-surface-hover text-text-tertiary p-1'
+                        }
+                      `}
+                      title={
                         deleteConfirmId === conv.id
-                          ? 'bg-red-500 text-white px-2 py-1 opacity-100 font-medium'
-                          : 'hover:bg-surface-hover text-text-tertiary p-1'
+                          ? 'Click to confirm deletion'
+                          : 'Delete conversation'
                       }
-                    `}
-                    title={
-                      deleteConfirmId === conv.id
-                        ? 'Click to confirm deletion'
-                        : 'Delete conversation'
-                    }
-                    aria-label={
-                      deleteConfirmId === conv.id
-                        ? 'Confirm delete conversation'
-                        : 'Delete conversation'
-                    }
-                  >
-                    {deleteConfirmId === conv.id ? (
-                      <>
+                      aria-label={
+                        deleteConfirmId === conv.id
+                          ? 'Confirm delete conversation'
+                          : 'Delete conversation'
+                      }
+                    >
+                      {deleteConfirmId === conv.id ? (
+                        <>
+                          <svg
+                            className="w-4 h-4"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M5 13l4 4L19 7"
+                            />
+                          </svg>
+                          <span className="text-xs">Delete?</span>
+                        </>
+                      ) : (
                         <svg
                           className="w-4 h-4"
                           fill="none"
@@ -371,27 +548,12 @@ export function Sidebar({
                             strokeLinecap="round"
                             strokeLinejoin="round"
                             strokeWidth={2}
-                            d="M5 13l4 4L19 7"
+                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
                           />
                         </svg>
-                        <span className="text-xs">Delete?</span>
-                      </>
-                    ) : (
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                        />
-                      </svg>
-                    )}
-                  </button>
+                      )}
+                    </button>
+                  </div>
                 </div>
 
                 {/* Last message preview */}
