@@ -1,8 +1,51 @@
 # MCP Webview Host
 
-**Secure webview host for Model Context Protocol (MCP) servers with elicitation support**
+**A local chat interface for Model Context Protocol (MCP) servers with interactive webview support**
 
-A local MCP host with integrated webview support for displaying HTML content, forms, and handling user interactions from MCP servers.
+A modern web-based chat application that connects to Ollama LLMs and allows MCP servers to display interactive HTML forms, visualizations, and custom UI components.
+
+## What is MCP?
+
+**Model Context Protocol (MCP)** is a standard protocol that allows AI assistants to interact with external tools and services. Think of it like plugins for AI - MCP servers provide specialized capabilities (like database access, API integrations, or custom workflows) that the AI can use to help users.
+
+## What are Webviews?
+
+**Webviews** are interactive HTML interfaces that MCP servers can display to collect user input or show results. Instead of just returning text, an MCP server can:
+
+- Show interactive forms for data collection
+- Display visualizations and charts
+- Render custom UI components
+- Create multi-step wizards
+
+**Key Feature:** Webviews can submit data directly to the backend, completely bypassing the chat interface. This means sensitive data (like passwords or credit card numbers) never appears in chat history.
+
+## How It Works
+
+```
+1. User asks AI a question
+   ↓
+2. AI decides to use an MCP tool
+   ↓
+3. MCP server responds with a webview (HTML)
+   ↓
+4. User interacts with the form
+   ↓
+5. Form submits directly to backend via POST
+   ↓
+6. MCP server processes the data
+   ↓
+7. AI receives the result and continues
+```
+
+**Example Flow:**
+```
+User: "Make a restaurant reservation"
+  → AI calls restaurant MCP tool
+  → Restaurant form appears
+  → User fills in name, date, time
+  → Form POSTs to backend
+  → Confirmation number returned
+```
 
 ## Quick Start
 
@@ -14,153 +57,172 @@ npx @gdimaki-ai/mcp-webview-host
 
 That's it! The server will start and open in your browser automatically.
 
-**Want to test it?** See [TESTING.md](./TESTING.md) or run `./test.sh` for interactive testing options.
-
 ## Features
 
-- 🔌 **Full MCP Protocol Support** - Tools, resources, prompts, and elicitation
-- 🖼️ **Secure Webview Rendering** - Sandboxed iframe execution with trust levels
-- 🔒 **Phase 1-3 Security** - XSS prevention, CSP, sandbox attributes, direct backend communication
-- 📋 **Elicitation Support** - Both form mode and URL mode
-- ⚡ **Real-time Updates** - WebSocket-based communication
+- 🔌 **Full MCP Protocol Support** - Tools, resources, prompts
+- 🖼️ **Interactive Webviews** - Forms, visualizations, custom UI
+- 🔒 **Secure Data Submission** - Direct backend POST, bypasses chat
+- ⚡ **Real-time Chat** - WebSocket-based communication
 - 🎨 **Modern UI** - React + TypeScript + Tailwind CSS
-- ✅ **Well Tested** - 126 tests covering all security features
-- 🌓 **Light/Dark Mode** - Theme support with system preference detection
-- 🏷️ **Intelligent Conversation Titles** - Auto-generated from first message
-- 🛠️ **Full MCP Tool Calling** - LLM can directly execute MCP tools
+- 🌓 **Light/Dark Mode** - Theme support
+- 🤖 **Ollama Integration** - Local LLM support
 
-## Architecture
+## Example MCP Server
 
-- **Frontend**: React + TypeScript + Vite + Tailwind CSS
-- **Backend**: Node.js + Express + MCP SDK
-- **Security**: Multi-layer sandboxing, CSP, DOMPurify
-- **Protocol**: Full Model Context Protocol implementation
+Check out the **Restaurant MCP Server** in `examples/restaurant-mcp-server.js`:
 
-## Test Coverage
+- View menu with photos
+- Make reservations with interactive form
+- Get wine pairing recommendations
+- View chef's special
+- Secure payment demo (shows data bypassing chat)
 
-- **Frontend**: 82% coverage (78 tests)
-- **Backend**: 90% routes coverage (48 tests)
-- **Security**: All Phase 1-3 features tested
+## Creating Your Own MCP Server
 
-## Getting Started
+MCP servers are just Node.js scripts that:
 
-### Option 1: NPX (Recommended)
+1. Define tools (functions the AI can call)
+2. Return responses (text or HTML webviews)
+3. Handle form submissions
 
-Just run:
-```bash
-npx @gdimaki-ai/mcp-webview-host
+**Basic structure:**
+```javascript
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+
+const server = new Server({ name: 'my-server', version: '1.0.0' });
+
+// Define a tool
+server.setRequestHandler(ListToolsRequestSchema, async () => ({
+  tools: [
+    {
+      name: 'my_tool',
+      description: 'Does something cool',
+      inputSchema: { type: 'object', properties: {} }
+    }
+  ]
+}));
+
+// Handle tool calls
+server.setRequestHandler(CallToolRequestSchema, async (request) => {
+  if (request.params.name === 'my_tool') {
+    return {
+      content: [
+        { type: 'text', text: 'Hello!' },
+        {
+          type: 'resource',
+          resource: {
+            uri: 'webview://my-form',
+            mimeType: 'text/html',
+            text: '<html><!-- your HTML form --></html>'
+          }
+        }
+      ]
+    };
+  }
+});
 ```
 
-### Option 2: Local Development
+## Webview Forms
 
-1. Install backend dependencies:
-```bash
-cd backend
-npm install
+Forms in webviews can submit directly to the backend:
+
+```javascript
+// In your webview HTML
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const formData = new FormData(e.target);
+  const data = Object.fromEntries(formData);
+
+  // POST directly to backend - never touches chat!
+  const response = await fetch('/api/mcp/tools/call', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      serverName: 'my-server',
+      toolName: 'process_form',
+      args: data
+    })
+  });
+
+  // Handle response
+  const result = await response.json();
+});
 ```
 
-2. Install frontend dependencies:
-```bash
-cd frontend
-npm install
+## Configuration
+
+Add your MCP servers to `backend/mcp-config.json`:
+
+```json
+{
+  "mcpServers": {
+    "my-server": {
+      "command": "node",
+      "args": ["./examples/my-server.js"],
+      "description": "My custom MCP server",
+      "trustLevel": "verified"
+    }
+  }
+}
 ```
 
-### Running the Application
+**Trust Levels:**
+- `verified` - Full access to backend submission
+- `trusted` - Can display webviews
+- `unverified` - Text only, no webviews
 
-1. Start Ollama (in a separate terminal):
+## Local Development
+
+1. **Install dependencies:**
+```bash
+cd backend && npm install
+cd ../frontend && npm install
+```
+
+2. **Start Ollama:**
 ```bash
 ollama serve
 ```
 
-2. Start the backend server:
+3. **Start backend:**
 ```bash
-cd backend
-npm run dev
+cd backend && npm run dev
 ```
 
-3. Start the frontend:
+4. **Start frontend:**
 ```bash
-cd frontend
-npm run dev
+cd frontend && npm run dev
 ```
 
-4. Open http://localhost:5173 in your browser
+5. Open http://localhost:5173
 
-## Usage
+## Architecture
 
-- Type messages in the chat input to converse with the LLM
-- The LLM can respond with text or render webviews for:
-  - Data visualizations
-  - Interactive forms
-  - Results display (similar to Jupyter notebooks)
-  - Custom UI components
-- Click demo buttons to see example webviews
-- Configure MCP servers to extend functionality
+- **Frontend**: React + TypeScript (port 5173)
+- **Backend**: Node.js + Express (port 3000)
+- **MCP Servers**: Node.js scripts (stdio transport)
+- **LLM**: Ollama (local inference)
+- **Communication**: WebSocket for chat, HTTP POST for forms
 
-## MCP Integration
+## Security
 
-The application supports **Model Context Protocol (MCP)** for extensibility with a unique feature: **Direct Webview Elicitation** that bypasses the LLM for privacy and security.
+Webviews are sandboxed with multiple security layers:
 
-### Key Features
+1. **Iframe Sandbox** - Restricted permissions
+2. **Content Security Policy** - Prevents XSS
+3. **DOMPurify** - HTML sanitization
+4. **Direct Backend POST** - Sensitive data bypasses chat
+5. **Trust Levels** - Control what servers can do
 
-- **Direct Rendering:** MCP webviews are displayed in modal overlays, NOT in chat history
-- **Privacy:** Data collected from MCP webviews never touches the LLM
-- **Secure Data Collection:** Perfect for collecting credentials, API keys, personal info
-- **Interactive Wizards:** Multi-step forms and workflows
-- **Configure servers** in `backend/mcp-config.json`
+## Example Use Cases
 
-### How It Works
-
-```
-User clicks MCP tool → Webview displayed in modal
-       ↓
-User fills form → Data sent directly to MCP server
-       ↓
-LLM never sees the data → Perfect for sensitive information
-```
-
-### Example Use Cases
-
-- **Credential Collection:** API keys, database passwords
-- **Configuration Wizards:** Multi-step setup processes
-- **Data Query Builders:** Interactive database query construction
-- **Feedback Forms:** User surveys and feedback
-- **File Uploads:** Process files without LLM involvement
-
-### Quick Start
-
-1. See complete working example: [`examples/mcp-webview-example.js`](./examples/mcp-webview-example.js)
-2. Read developer guide: [MCP_WEBVIEW_DEVELOPER_GUIDE.md](./docs/MCP_WEBVIEW_DEVELOPER_GUIDE.md)
-3. Configure your server in `backend/mcp-config.json`
-4. Click "MCP Tools" button in the UI
-
-## Documentation
-
-### Getting Started
-- [QUICKSTART.md](./docs/QUICKSTART.md) - Quick start guide
-- [WEBVIEW_GUIDE.md](./docs/WEBVIEW_GUIDE.md) - Webview usage and examples
-- [MCP_GUIDE.md](./docs/MCP_GUIDE.md) - MCP integration overview
-
-### MCP Development
-- [MCP_WEBVIEW_DEVELOPER_GUIDE.md](./docs/MCP_WEBVIEW_DEVELOPER_GUIDE.md) - **Complete guide to creating MCP servers with webviews**
-- [MCP_ELICITATION_GUIDE.md](./docs/MCP_ELICITATION_GUIDE.md) - Guide to MCP elicitation (form & URL modes)
-- [ELICITATION_AND_NOTIFICATIONS.md](./docs/ELICITATION_AND_NOTIFICATIONS.md) - Elicitation and notification patterns
-- [examples/mcp-webview-example.js](./examples/mcp-webview-example.js) - **Working MCP server example**
-
-### Security
-- [Phase_3_Direct_Backend_Communication_Guide.md](./docs/Phase_3_Direct_Backend_Communication_Guide.md) - **Guide for secure sensitive data submission**
-- [WEBVIEW_SECURITY_ASSESSMENT.md](./docs/WEBVIEW_SECURITY_ASSESSMENT.md) - Security architecture and analysis
-- [2025-11-21_23-53_MCP_Security_Implementation.md](./docs/2025-11-21_23-53_MCP_Security_Implementation.md) - Complete security implementation documentation
-
-### Technical Reference
-- [MCP_SPEC_COMPLIANCE_ANALYSIS.md](./docs/MCP_SPEC_COMPLIANCE_ANALYSIS.md) - MCP specification compliance
-- [EMBEDDING_ATTACK_EXPLAINED.md](./docs/EMBEDDING_ATTACK_EXPLAINED.md) - Security attack vectors explained
-
-## Development
-
-- Frontend runs on port 5173 (Vite default)
-- Backend runs on port 3000
-- WebSocket connection for real-time chat
+- **Database Tools** - Query builders with form inputs
+- **API Integrations** - OAuth flows, credential collection
+- **Data Entry** - Forms for structured data
+- **Visualizations** - Charts, graphs, tables
+- **Multi-step Wizards** - Complex workflows
+- **Payment Processing** - Secure payment forms
 
 ## License
 

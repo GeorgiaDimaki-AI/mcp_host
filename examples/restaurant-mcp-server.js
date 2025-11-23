@@ -910,6 +910,47 @@ function generateReservationFormHTML() {
       transform: translateY(-2px);
       box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
     }
+    .success-container {
+      display: none;
+      text-align: center;
+      padding: 40px 20px;
+    }
+    .success-container.show {
+      display: block;
+    }
+    .success-icon {
+      width: 80px;
+      height: 80px;
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 24px;
+      font-size: 48px;
+    }
+    .confirmation-number {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 16px 32px;
+      border-radius: 12px;
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      margin: 24px 0;
+      box-shadow: 0 4px 20px rgba(102, 126, 234, 0.3);
+    }
+    .reservation-details {
+      background: #f9fafb;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 24px 0;
+      text-align: left;
+    }
+    .reservation-details p {
+      margin: 8px 0;
+      color: #374151;
+    }
   </style>
 </head>
 <body>
@@ -918,6 +959,7 @@ function generateReservationFormHTML() {
       <h1>🍽️ Make a Reservation</h1>
       <p>Experience fine dining at La Maison Élégante</p>
     </div>
+
     <form id="reservationForm">
       <div class="form-group">
         <label>Your Name *</label>
@@ -956,11 +998,24 @@ function generateReservationFormHTML() {
       </div>
       <button type="submit">Confirm Reservation ✓</button>
     </form>
+
+    <div id="successView" class="success-container">
+      <div class="success-icon">✓</div>
+      <h2 style="color: #10b981; margin-bottom: 16px;">Reservation Confirmed!</h2>
+      <p style="color: #6b7280; margin-bottom: 8px;">Your confirmation number:</p>
+      <div class="confirmation-number" id="confirmationNumber"></div>
+      <div class="reservation-details" id="reservationDetails"></div>
+      <p style="color: #6b7280; font-size: 14px; margin-top: 24px;">
+        A confirmation email has been sent to your email address.<br>
+        Please save your confirmation number for managing your reservation.
+      </p>
+    </div>
   </div>
 
   <script>
     const form = document.getElementById('reservationForm');
     const submitButton = form.querySelector('button[type="submit"]');
+    const successView = document.getElementById('successView');
 
     form.addEventListener('submit', async function(e) {
       e.preventDefault();
@@ -1001,12 +1056,23 @@ function generateReservationFormHTML() {
         const result = await response.json();
         console.log('Reservation created:', result);
 
-        // Show success message in the form
-        submitButton.disabled = false;
-        submitButton.innerHTML = '✓ Reservation Confirmed!';
-        submitButton.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+        // Hide form and show success view
+        form.style.display = 'none';
+        successView.classList.add('show');
 
-        // Notify parent of success and show confirmation
+        // Populate confirmation details
+        document.getElementById('confirmationNumber').textContent = confirmationNumber;
+
+        const detailsHTML = \`
+          <p><strong>Name:</strong> \${reservationData.name}</p>
+          <p><strong>Date:</strong> \${new Date(reservationData.date).toLocaleDateString()}</p>
+          <p><strong>Time:</strong> \${reservationData.time}</p>
+          <p><strong>Party Size:</strong> \${reservationData.partySize} guests</p>
+          \${reservationData.specialRequests ? \`<p><strong>Special Requests:</strong> \${reservationData.specialRequests}</p>\` : ''}
+        \`;
+        document.getElementById('reservationDetails').innerHTML = detailsHTML;
+
+        // Notify parent of success
         if (typeof window.sendToHost === 'function') {
           window.sendToHost({
             type: 'reservation-success',
@@ -1014,14 +1080,6 @@ function generateReservationFormHTML() {
             result: result
           });
         }
-
-        // Optionally reload or show confirmation in same window
-        setTimeout(() => {
-          alert('Reservation confirmed! Your confirmation number is: ' + confirmationNumber);
-          form.reset();
-          submitButton.innerHTML = 'Confirm Reservation ✓';
-          submitButton.style.background = '';
-        }, 1000);
 
       } catch (error) {
         console.error('Error submitting form:', error);
