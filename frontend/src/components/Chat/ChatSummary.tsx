@@ -173,7 +173,7 @@ export function ChatSummary({ isOpen, onClose, messages }: ChatSummaryProps) {
         {/* Preview */}
         <div className="flex-1 overflow-y-auto px-6 py-4 bg-background-primary">
           <div className="bg-background-secondary rounded-lg border border-border p-4">
-            <pre className="text-xs font-mono whitespace-pre-wrap text-gray-800 max-h-[50vh] overflow-y-auto">
+            <pre className="text-xs font-mono whitespace-pre-wrap text-text-primary max-h-[50vh] overflow-y-auto">
               {summaryText}
             </pre>
           </div>
