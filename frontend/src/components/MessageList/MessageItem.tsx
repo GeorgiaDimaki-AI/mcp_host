@@ -42,8 +42,8 @@ export function MessageItem({ message, onWebviewMessage }: MessageItemProps) {
               ${isUser
                 ? 'bg-blue-500 text-white'
                 : isSystem
-                ? 'bg-gray-100 text-gray-700 italic'
-                : 'bg-gray-100 text-gray-900'
+                ? 'bg-background-tertiary text-text-secondary italic'
+                : 'bg-background-tertiary text-text-primary'
               }
             `}
           >
@@ -74,7 +74,7 @@ export function MessageItem({ message, onWebviewMessage }: MessageItemProps) {
             </div>
 
             {/* Webview container with shadow and border */}
-            <div className="rounded-lg overflow-hidden shadow-lg border-2 border-purple-200 bg-white">
+            <div className="rounded-lg overflow-hidden shadow-lg border-2 border-purple-200 bg-background-secondary">
               <WebviewRenderer
                 content={message.webview}
                 onMessage={handleWebviewMessage}
@@ -84,7 +84,7 @@ export function MessageItem({ message, onWebviewMessage }: MessageItemProps) {
         )}
 
         {/* Timestamp */}
-        <div className={`text-xs text-gray-500 mt-2 ${isUser ? 'text-right' : 'text-left'}`}>
+        <div className={`text-xs text-text-tertiary mt-2 ${isUser ? 'text-right' : 'text-left'}`}>
           {new Date(message.timestamp).toLocaleTimeString()}
         </div>
       </div>

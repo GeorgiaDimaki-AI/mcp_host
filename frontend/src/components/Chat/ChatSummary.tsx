@@ -123,16 +123,16 @@ export function ChatSummary({ isOpen, onClose, messages }: ChatSummaryProps) {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-background-secondary rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">Chat Summary</h2>
-            <p className="text-sm text-gray-600 mt-1">{messages.length} messages</p>
+            <h2 className="text-xl font-semibold text-text-primary">Chat Summary</h2>
+            <p className="text-sm text-text-secondary mt-1">{messages.length} messages</p>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-gray-400 hover:text-text-secondary transition-colors"
             title="Close"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -142,16 +142,16 @@ export function ChatSummary({ isOpen, onClose, messages }: ChatSummaryProps) {
         </div>
 
         {/* Format Selector */}
-        <div className="px-6 py-3 border-b border-gray-200 bg-gray-50">
+        <div className="px-6 py-3 border-b border-border bg-background-primary">
           <div className="flex items-center gap-4">
-            <label className="text-sm font-medium text-gray-700">Format:</label>
+            <label className="text-sm font-medium text-text-secondary">Format:</label>
             <div className="flex gap-2">
               <button
                 onClick={() => setFormat('markdown')}
                 className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
                   format === 'markdown'
                     ? 'bg-blue-600 text-white'
-                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                    : 'bg-background-secondary text-text-secondary border border-border-dark hover:bg-background-primary'
                 }`}
               >
                 Markdown
@@ -161,7 +161,7 @@ export function ChatSummary({ isOpen, onClose, messages }: ChatSummaryProps) {
                 className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
                   format === 'text'
                     ? 'bg-blue-600 text-white'
-                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                    : 'bg-background-secondary text-text-secondary border border-border-dark hover:bg-background-primary'
                 }`}
               >
                 Plain Text
@@ -171,8 +171,8 @@ export function ChatSummary({ isOpen, onClose, messages }: ChatSummaryProps) {
         </div>
 
         {/* Preview */}
-        <div className="flex-1 overflow-y-auto px-6 py-4 bg-gray-50">
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
+        <div className="flex-1 overflow-y-auto px-6 py-4 bg-background-primary">
+          <div className="bg-background-secondary rounded-lg border border-border p-4">
             <pre className="text-xs font-mono whitespace-pre-wrap text-gray-800 max-h-[50vh] overflow-y-auto">
               {summaryText}
             </pre>
@@ -180,14 +180,14 @@ export function ChatSummary({ isOpen, onClose, messages }: ChatSummaryProps) {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-gray-50">
-          <div className="text-sm text-gray-600">
+        <div className="flex items-center justify-between px-6 py-4 border-t border-border bg-background-primary">
+          <div className="text-sm text-text-secondary">
             {format === 'markdown' ? '📝 Markdown format' : '📄 Plain text format'}
           </div>
           <div className="flex items-center gap-3">
             <button
               onClick={onClose}
-              className="px-4 py-2 text-gray-700 hover:text-gray-900 transition-colors"
+              className="px-4 py-2 text-text-secondary hover:text-text-primary transition-colors"
             >
               Close
             </button>

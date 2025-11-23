@@ -185,12 +185,12 @@ export function WebviewRenderer({ content, onMessage }: WebviewRendererProps) {
   return (
     <div className="relative">
       {/* Webview container with badge */}
-      <div className="border border-gray-200 rounded-lg">
+      <div className="border border-border rounded-lg">
         {/* Trust Badge */}
         {content.source === 'mcp' && (
-          <div className="flex items-center justify-between px-3 py-1.5 bg-gray-50 border-b border-gray-200 rounded-t-lg">
+          <div className="flex items-center justify-between px-3 py-1.5 bg-background-primary border-b border-border rounded-t-lg">
             <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-600">
+              <span className="text-xs text-text-secondary">
                 {content.mcpServer && `${content.mcpServer}`}
                 {content.mcpTool && ` → ${content.mcpTool}`}
               </span>
@@ -218,7 +218,7 @@ export function WebviewRenderer({ content, onMessage }: WebviewRendererProps) {
         )}
 
         {/* Webview iframe with scrollable container */}
-        <div className="rounded-b-lg overflow-auto bg-white" style={{ maxHeight: '600px' }}>
+        <div className="rounded-b-lg overflow-auto bg-background-secondary" style={{ maxHeight: '600px' }}>
           <iframe
             srcDoc={htmlDocument}
             // SECURITY: Trust-based sandbox configuration
@@ -226,7 +226,7 @@ export function WebviewRenderer({ content, onMessage }: WebviewRendererProps) {
             // - Trusted/Verified: Scripts and forms allowed
             // - Never use 'allow-same-origin' (prevents sandbox escape)
             sandbox={getSandboxAttribute(trustLevel)}
-            className="w-full border-0 bg-white"
+            className="w-full border-0 bg-background-secondary"
             style={{ minHeight: '300px', height: '500px' }}
             title="webview"
           />

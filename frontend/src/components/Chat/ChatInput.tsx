@@ -40,7 +40,7 @@ export function ChatInput({ onSend, disabled, placeholder }: ChatInputProps) {
   }, [input]);
 
   return (
-    <div className="border-t border-gray-200 bg-white p-4">
+    <div className="border-t border-border bg-background-secondary p-4">
       <div className="flex gap-2 items-end max-w-4xl mx-auto">
         <textarea
           ref={textareaRef}
@@ -51,9 +51,9 @@ export function ChatInput({ onSend, disabled, placeholder }: ChatInputProps) {
           disabled={disabled}
           rows={1}
           className="
-            flex-1 resize-none rounded-lg border border-gray-300 px-4 py-3
+            flex-1 resize-none rounded-lg border border-border-dark px-4 py-3
             focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
-            disabled:bg-gray-100 disabled:cursor-not-allowed
+            disabled:bg-background-tertiary disabled:cursor-not-allowed
             text-sm
           "
         />
@@ -71,7 +71,7 @@ export function ChatInput({ onSend, disabled, placeholder }: ChatInputProps) {
           Send
         </button>
       </div>
-      <div className="text-xs text-gray-500 mt-2 text-center">
+      <div className="text-xs text-text-tertiary mt-2 text-center">
         Press Enter to send, Shift+Enter for new line
       </div>
     </div>

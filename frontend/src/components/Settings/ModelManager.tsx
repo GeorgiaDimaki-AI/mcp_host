@@ -121,23 +121,23 @@ export function ModelManager({ isOpen, onClose, onModelPulled, installedModels }
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-lg shadow-xl max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto"
+        className="bg-background-secondary rounded-lg shadow-xl max-w-3xl w-full mx-4 max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="border-b border-gray-200 px-6 py-4">
+        <div className="border-b border-border px-6 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-semibold text-gray-900">
+              <h2 className="text-xl font-semibold text-text-primary">
                 Download Models
               </h2>
-              <p className="text-sm text-gray-600 mt-1">
+              <p className="text-sm text-text-secondary mt-1">
                 Download models from the Ollama library
               </p>
             </div>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
+              className="text-gray-400 hover:text-text-secondary transition-colors"
               aria-label="Close"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -151,7 +151,7 @@ export function ModelManager({ isOpen, onClose, onModelPulled, installedModels }
         <div className="px-6 py-4">
           {/* Custom model input */}
           <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-text-secondary mb-2">
               Custom Model Name
             </label>
             <div className="flex gap-2">
@@ -160,7 +160,7 @@ export function ModelManager({ isOpen, onClose, onModelPulled, installedModels }
                 value={customModel}
                 onChange={(e) => setCustomModel(e.target.value)}
                 placeholder="e.g., llama3.2:3b, mistral:latest"
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="flex-1 px-3 py-2 border border-border-dark rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 disabled={pulling !== null}
               />
               <button
@@ -171,7 +171,7 @@ export function ModelManager({ isOpen, onClose, onModelPulled, installedModels }
                 Pull
               </button>
             </div>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-text-tertiary mt-1">
               Visit <a href="https://ollama.com/library" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">ollama.com/library</a> to explore all available models
             </p>
           </div>
@@ -213,7 +213,7 @@ export function ModelManager({ isOpen, onClose, onModelPulled, installedModels }
 
           {/* Popular models */}
           <div>
-            <h3 className="text-sm font-medium text-gray-900 mb-3">Popular Models</h3>
+            <h3 className="text-sm font-medium text-text-primary mb-3">Popular Models</h3>
             <div className="grid gap-3">
               {POPULAR_MODELS.map((model) => {
                 const isInstalled = installedModels.some(
@@ -228,12 +228,12 @@ export function ModelManager({ isOpen, onClose, onModelPulled, installedModels }
                     className={`flex items-center justify-between p-3 border rounded-lg transition-colors ${
                       isInstalled
                         ? 'border-green-300 bg-green-50'
-                        : 'border-gray-200 hover:border-blue-300'
+                        : 'border-border hover:border-blue-300'
                     }`}
                   >
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <h4 className={`text-sm font-medium ${isInstalled ? 'text-green-900' : 'text-gray-900'}`}>
+                        <h4 className={`text-sm font-medium ${isInstalled ? 'text-green-900' : 'text-text-primary'}`}>
                           {model.name}
                         </h4>
                         {isInstalled && (
@@ -242,10 +242,10 @@ export function ModelManager({ isOpen, onClose, onModelPulled, installedModels }
                           </span>
                         )}
                       </div>
-                      <p className={`text-xs mt-0.5 ${isInstalled ? 'text-green-700' : 'text-gray-600'}`}>
+                      <p className={`text-xs mt-0.5 ${isInstalled ? 'text-green-700' : 'text-text-secondary'}`}>
                         {model.description}
                       </p>
-                      <p className={`text-xs mt-1 ${isInstalled ? 'text-green-600' : 'text-gray-500'}`}>
+                      <p className={`text-xs mt-1 ${isInstalled ? 'text-green-600' : 'text-text-tertiary'}`}>
                         Size: {model.size}
                       </p>
                     </div>
@@ -256,8 +256,8 @@ export function ModelManager({ isOpen, onClose, onModelPulled, installedModels }
                         pulling === model.name
                           ? 'bg-blue-100 text-blue-700'
                           : isInstalled
-                          ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                          : 'bg-blue-500 text-white hover:bg-blue-600 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed'
+                          ? 'bg-surface text-text-tertiary cursor-not-allowed'
+                          : 'bg-blue-500 text-white hover:bg-blue-600 disabled:bg-gray-300 disabled:text-text-tertiary disabled:cursor-not-allowed'
                       }`}
                     >
                       {pulling === model.name ? 'Downloading...' : isInstalled ? 'Installed' : 'Download'}
@@ -269,10 +269,10 @@ export function ModelManager({ isOpen, onClose, onModelPulled, installedModels }
           </div>
 
           {/* Info box */}
-          <div className="mt-6 bg-gray-50 border border-gray-200 rounded-lg p-4">
+          <div className="mt-6 bg-background-primary border border-border rounded-lg p-4">
             <div className="flex gap-3">
               <svg
-                className="w-5 h-5 text-gray-500 flex-shrink-0 mt-0.5"
+                className="w-5 h-5 text-text-tertiary flex-shrink-0 mt-0.5"
                 fill="currentColor"
                 viewBox="0 0 20 20"
               >
@@ -283,8 +283,8 @@ export function ModelManager({ isOpen, onClose, onModelPulled, installedModels }
                 />
               </svg>
               <div>
-                <h4 className="text-sm font-medium text-gray-900">About Model Downloads</h4>
-                <p className="text-sm text-gray-600 mt-1">
+                <h4 className="text-sm font-medium text-text-primary">About Model Downloads</h4>
+                <p className="text-sm text-text-secondary mt-1">
                   Models are downloaded from Ollama's library and stored locally.
                   Download times vary based on your internet connection and model size.
                   Make sure you have enough disk space before downloading large models.
@@ -295,10 +295,10 @@ export function ModelManager({ isOpen, onClose, onModelPulled, installedModels }
         </div>
 
         {/* Footer */}
-        <div className="border-t border-gray-200 px-6 py-4 bg-gray-50">
+        <div className="border-t border-border px-6 py-4 bg-background-primary">
           <button
             onClick={onClose}
-            className="w-full px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            className="w-full px-4 py-2 text-sm font-medium text-text-secondary bg-background-secondary border border-border-dark rounded-lg hover:bg-background-primary transition-colors"
           >
             Close
           </button>

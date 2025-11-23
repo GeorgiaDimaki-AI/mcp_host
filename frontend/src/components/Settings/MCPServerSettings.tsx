@@ -126,13 +126,13 @@ export function MCPServerSettings({ isOpen, onClose }: MCPServerSettingsProps) {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-background-secondary rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">MCP Server Configuration</h2>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+          <h2 className="text-xl font-semibold text-text-primary">MCP Server Configuration</h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-gray-400 hover:text-text-secondary transition-colors"
             title="Close"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -159,7 +159,7 @@ export function MCPServerSettings({ isOpen, onClose }: MCPServerSettingsProps) {
           {/* Server List */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-medium text-gray-900">Configured Servers</h3>
+              <h3 className="text-lg font-medium text-text-primary">Configured Servers</h3>
               <button
                 onClick={() => setIsAddingNew(!isAddingNew)}
                 className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
@@ -184,13 +184,13 @@ export function MCPServerSettings({ isOpen, onClose }: MCPServerSettingsProps) {
 
             {/* Existing Servers */}
             {Object.entries(servers).length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
+              <div className="text-center py-8 text-text-tertiary">
                 <p>No MCP servers configured</p>
                 <p className="text-sm mt-1">Click "Add Server" to get started</p>
               </div>
             ) : (
               Object.entries(servers).map(([name, config]) => (
-                <div key={name} className="border border-gray-200 rounded-lg p-4">
+                <div key={name} className="border border-border rounded-lg p-4">
                   {editingServer === name ? (
                     <ServerForm
                       server={{ ...config, name }}
@@ -226,10 +226,10 @@ export function MCPServerSettings({ isOpen, onClose }: MCPServerSettingsProps) {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50">
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-border bg-background-primary">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-gray-700 hover:text-gray-900 transition-colors"
+            className="px-4 py-2 text-text-secondary hover:text-text-primary transition-colors"
           >
             Cancel
           </button>
@@ -274,13 +274,13 @@ function ServerDisplay({ name, config, onEdit, onDelete }: ServerDisplayProps) {
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1">
           <div className="flex items-center gap-2">
-            <h4 className="font-medium text-gray-900">{name}</h4>
+            <h4 className="font-medium text-text-primary">{name}</h4>
             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${badge.bg} ${badge.color}`}>
               {badge.icon} {badge.label}
             </span>
           </div>
-          <p className="text-sm text-gray-600 mt-1">
-            <code className="bg-gray-100 px-2 py-1 rounded text-xs">
+          <p className="text-sm text-text-secondary mt-1">
+            <code className="bg-background-tertiary px-2 py-1 rounded text-xs">
               {config.command} {config.args?.join(' ')}
             </code>
           </p>
@@ -305,10 +305,10 @@ function ServerDisplay({ name, config, onEdit, onDelete }: ServerDisplayProps) {
 
       {config.env && Object.keys(config.env).length > 0 && (
         <div className="mt-2">
-          <p className="text-xs font-medium text-gray-700 mb-1">Environment Variables:</p>
-          <div className="bg-gray-50 rounded p-2 text-xs font-mono">
+          <p className="text-xs font-medium text-text-secondary mb-1">Environment Variables:</p>
+          <div className="bg-background-primary rounded p-2 text-xs font-mono">
             {Object.entries(config.env).map(([key, value]) => (
-              <div key={key} className="text-gray-600">
+              <div key={key} className="text-text-secondary">
                 {key}={value}
               </div>
             ))}
@@ -355,10 +355,10 @@ function ServerForm({ server, onChange, onSave, onCancel, isNew }: ServerFormPro
   };
 
   return (
-    <div className="space-y-4 bg-gray-50 rounded-lg p-4">
+    <div className="space-y-4 bg-background-primary rounded-lg p-4">
       {/* Server Name */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-text-secondary mb-1">
           Server Name <span className="text-red-500">*</span>
         </label>
         <input
@@ -366,68 +366,68 @@ function ServerForm({ server, onChange, onSave, onCancel, isNew }: ServerFormPro
           value={server.name}
           onChange={(e) => onChange({ ...server, name: e.target.value })}
           disabled={!isNew}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+          className="w-full px-3 py-2 border border-border-dark rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-background-tertiary disabled:cursor-not-allowed"
           placeholder="my-mcp-server"
         />
         {!isNew && (
-          <p className="text-xs text-gray-500 mt-1">Server name cannot be changed after creation</p>
+          <p className="text-xs text-text-tertiary mt-1">Server name cannot be changed after creation</p>
         )}
       </div>
 
       {/* Command */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-text-secondary mb-1">
           Command <span className="text-red-500">*</span>
         </label>
         <input
           type="text"
           value={server.command}
           onChange={(e) => onChange({ ...server, command: e.target.value })}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 py-2 border border-border-dark rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           placeholder="node"
         />
-        <p className="text-xs text-gray-500 mt-1">Executable command (e.g., node, python, ./script.sh)</p>
+        <p className="text-xs text-text-tertiary mt-1">Executable command (e.g., node, python, ./script.sh)</p>
       </div>
 
       {/* Arguments */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-text-secondary mb-1">
           Arguments (one per line)
         </label>
         <textarea
           value={argsText}
           onChange={(e) => handleArgsChange(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+          className="w-full px-3 py-2 border border-border-dark rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
           rows={3}
           placeholder="examples/my-server.js&#10;--port&#10;8080"
         />
-        <p className="text-xs text-gray-500 mt-1">Command-line arguments passed to the command</p>
+        <p className="text-xs text-text-tertiary mt-1">Command-line arguments passed to the command</p>
       </div>
 
       {/* Environment Variables */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-text-secondary mb-1">
           Environment Variables (KEY=VALUE format, one per line)
         </label>
         <textarea
           value={envText}
           onChange={(e) => handleEnvChange(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+          className="w-full px-3 py-2 border border-border-dark rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
           rows={3}
           placeholder="API_KEY=your-key&#10;DEBUG=true&#10;PORT=3000"
         />
-        <p className="text-xs text-gray-500 mt-1">Optional environment variables for the MCP server</p>
+        <p className="text-xs text-text-tertiary mt-1">Optional environment variables for the MCP server</p>
       </div>
 
       {/* Trust Level */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-text-secondary mb-1">
           Trust Level
         </label>
         <select
           value={server.trustLevel || 'unverified'}
           onChange={(e) => onChange({ ...server, trustLevel: e.target.value as TrustLevel })}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 py-2 border border-border-dark rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
           <option value="unverified">⚠️ Unverified (Static HTML only - safest)</option>
           <option value="trusted">⚡ Trusted (Scripts and forms enabled)</option>
@@ -447,7 +447,7 @@ function ServerForm({ server, onChange, onSave, onCancel, isNew }: ServerFormPro
       <div className="flex items-center justify-end gap-2 pt-2">
         <button
           onClick={onCancel}
-          className="px-4 py-2 text-gray-700 hover:text-gray-900 transition-colors text-sm"
+          className="px-4 py-2 text-text-secondary hover:text-text-primary transition-colors text-sm"
         >
           Cancel
         </button>

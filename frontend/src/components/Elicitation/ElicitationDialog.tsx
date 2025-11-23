@@ -60,7 +60,7 @@ function URLModeDialog({ request, onResponse }: ElicitationDialogProps) {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+      <div className="bg-background-secondary rounded-lg shadow-xl max-w-md w-full p-6">
         <div className="flex items-start mb-4">
           <div className="flex-shrink-0">
             <svg className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -68,22 +68,22 @@ function URLModeDialog({ request, onResponse }: ElicitationDialogProps) {
             </svg>
           </div>
           <div className="ml-3 flex-1">
-            <h3 className="text-lg font-medium text-gray-900">Secure Information Request</h3>
-            <p className="mt-1 text-sm text-gray-600">
+            <h3 className="text-lg font-medium text-text-primary">Secure Information Request</h3>
+            <p className="mt-1 text-sm text-text-secondary">
               <span className="font-semibold">{request.serverName}</span> needs additional information
             </p>
           </div>
         </div>
 
         <div className="mb-6">
-          <p className="text-sm text-gray-700 mb-4">{request.message}</p>
+          <p className="text-sm text-text-secondary mb-4">{request.message}</p>
 
           {request.url && (
             <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
               <p className="text-xs font-semibold text-yellow-800 mb-1">You will be redirected to:</p>
-              <div className="bg-white rounded px-2 py-1 font-mono text-xs break-all">
+              <div className="bg-background-secondary rounded px-2 py-1 font-mono text-xs break-all">
                 <span className="font-bold text-blue-600">{new URL(request.url).hostname}</span>
-                <span className="text-gray-600">{new URL(request.url).pathname + new URL(request.url).search}</span>
+                <span className="text-text-secondary">{new URL(request.url).pathname + new URL(request.url).search}</span>
               </div>
               <p className="text-xs text-yellow-700 mt-2">
                 ⚠️ This will open in a new tab. The MCP server will not see your input.
@@ -103,20 +103,20 @@ function URLModeDialog({ request, onResponse }: ElicitationDialogProps) {
           <button
             onClick={handleDecline}
             disabled={isOpening}
-            className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+            className="px-4 py-2 border border-border-dark rounded-md text-text-secondary hover:bg-background-primary focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
           >
             Decline
           </button>
           <button
             onClick={handleCancel}
             disabled={isOpening}
-            className="px-4 py-2 text-gray-500 hover:text-gray-700 focus:outline-none"
+            className="px-4 py-2 text-text-tertiary hover:text-text-secondary focus:outline-none"
           >
             Cancel
           </button>
         </div>
 
-        <p className="mt-4 text-xs text-gray-500">
+        <p className="mt-4 text-xs text-text-tertiary">
           Security: Data entered on the external page will not pass through this application.
         </p>
       </div>
@@ -141,9 +141,9 @@ function FormModeDialog({
   if (!schema || !schema.properties) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+        <div className="bg-background-secondary rounded-lg shadow-xl max-w-md w-full p-6">
           <p className="text-red-600">Invalid schema</p>
-          <button onClick={() => onResponse({ action: 'cancel' })} className="mt-4 px-4 py-2 bg-gray-200 rounded">
+          <button onClick={() => onResponse({ action: 'cancel' })} className="mt-4 px-4 py-2 bg-surface rounded">
             Close
           </button>
         </div>
@@ -170,26 +170,26 @@ function FormModeDialog({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 max-h-[80vh] overflow-y-auto">
+      <div className="bg-background-secondary rounded-lg shadow-xl max-w-md w-full p-6 max-h-[80vh] overflow-y-auto">
         <div className="mb-4">
-          <h3 className="text-lg font-medium text-gray-900">Information Request</h3>
-          <p className="mt-1 text-sm text-gray-600">
+          <h3 className="text-lg font-medium text-text-primary">Information Request</h3>
+          <p className="mt-1 text-sm text-text-secondary">
             <span className="font-semibold">{request.serverName}</span>
           </p>
         </div>
 
-        <p className="text-sm text-gray-700 mb-4">{request.message}</p>
+        <p className="text-sm text-text-secondary mb-4">{request.message}</p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {Object.entries(schema.properties).map(([key, fieldSchema]: [string, any]) => (
             <div key={key}>
-              <label htmlFor={`field-${key}`} className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor={`field-${key}`} className="block text-sm font-medium text-text-secondary mb-1">
                 {fieldSchema.title || key}
                 {schema.required?.includes(key) && <span className="text-red-500 ml-1">*</span>}
               </label>
 
               {fieldSchema.description && (
-                <p className="text-xs text-gray-500 mb-1">{fieldSchema.description}</p>
+                <p className="text-xs text-text-tertiary mb-1">{fieldSchema.description}</p>
               )}
 
               {renderFormField(key, fieldSchema, formData[key] || fieldSchema.default, handleInputChange, schema.required?.includes(key))}
@@ -206,14 +206,14 @@ function FormModeDialog({
             <button
               type="button"
               onClick={handleDecline}
-              className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+              className="px-4 py-2 border border-border-dark rounded-md text-text-secondary hover:bg-background-primary"
             >
               Decline
             </button>
             <button
               type="button"
               onClick={handleCancel}
-              className="px-4 py-2 text-gray-500 hover:text-gray-700"
+              className="px-4 py-2 text-text-tertiary hover:text-text-secondary"
             >
               Cancel
             </button>
@@ -234,7 +234,7 @@ function renderFormField(
   onChange: (key: string, value: any) => void,
   required: boolean
 ) {
-  const baseClasses = 'w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500';
+  const baseClasses = 'w-full px-3 py-2 border border-border-dark rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500';
 
   // Enum (select dropdown)
   if (fieldSchema.enum) {
@@ -284,7 +284,7 @@ function renderFormField(
         type="checkbox"
         checked={value || false}
         onChange={(e) => onChange(key, e.target.checked)}
-        className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+        className="h-4 w-4 text-blue-600 border-border-dark rounded focus:ring-blue-500"
       />
     );
   }

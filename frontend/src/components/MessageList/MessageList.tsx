@@ -24,7 +24,7 @@ export function MessageList({ messages, isLoading, onWebviewMessage }: MessageLi
   return (
     <div className="flex-1 overflow-y-auto px-4 py-6">
       {messages.length === 0 ? (
-        <div className="flex items-center justify-center h-full text-gray-500">
+        <div className="flex items-center justify-center h-full text-text-tertiary">
           <div className="text-center">
             <div className="text-4xl mb-4">💬</div>
             <p className="text-lg font-medium">No messages yet</p>
@@ -44,7 +44,7 @@ export function MessageList({ messages, isLoading, onWebviewMessage }: MessageLi
           {/* Loading indicator */}
           {isLoading && (
             <div className="flex justify-start mb-4">
-              <div className="bg-gray-100 rounded-lg px-4 py-3">
+              <div className="bg-background-tertiary rounded-lg px-4 py-3">
                 <div className="flex gap-1">
                   <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
                   <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
