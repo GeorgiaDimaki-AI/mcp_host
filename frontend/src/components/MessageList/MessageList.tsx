@@ -11,9 +11,10 @@ interface MessageListProps {
   messages: Message[];
   isLoading?: boolean;
   onWebviewMessage?: (messageId: string, data: any) => void;
+  onRegenerate?: (messageId: string) => void;
 }
 
-export function MessageList({ messages, isLoading, onWebviewMessage }: MessageListProps) {
+export function MessageList({ messages, isLoading, onWebviewMessage, onRegenerate }: MessageListProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom when new messages arrive
@@ -38,6 +39,7 @@ export function MessageList({ messages, isLoading, onWebviewMessage }: MessageLi
               key={message.id}
               message={message}
               onWebviewMessage={onWebviewMessage}
+              onRegenerate={onRegenerate}
             />
           ))}
 

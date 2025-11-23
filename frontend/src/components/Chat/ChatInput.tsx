@@ -3,7 +3,7 @@
  * Input area for sending messages
  */
 
-import { useState, KeyboardEvent, useRef, useEffect } from 'react';
+import { useState, KeyboardEvent, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 
 interface ChatInputProps {
   onSend: (message: string) => void;
@@ -11,9 +11,20 @@ interface ChatInputProps {
   placeholder?: string;
 }
 
-export function ChatInput({ onSend, disabled, placeholder }: ChatInputProps) {
-  const [input, setInput] = useState('');
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+export interface ChatInputRef {
+  focus: () => void;
+}
+
+export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
+  function ChatInput({ onSend, disabled, placeholder }, ref) {
+    const [input, setInput] = useState('');
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+    useImperativeHandle(ref, () => ({
+      focus: () => {
+        textareaRef.current?.focus();
+      },
+    }));
 
   const handleSend = () => {
     const trimmed = input.trim();
@@ -72,8 +83,8 @@ export function ChatInput({ onSend, disabled, placeholder }: ChatInputProps) {
         </button>
       </div>
       <div className="text-xs text-text-tertiary mt-2 text-center">
-        Press Enter to send, Shift+Enter for new line
+        Press Enter to send, Shift+Enter for new line • Cmd/Ctrl+K: New chat • Cmd/Ctrl+/: Toggle sidebar
       </div>
     </div>
   );
-}
+});
