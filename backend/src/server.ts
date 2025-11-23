@@ -448,7 +448,7 @@ async function handleChatMessage(ws: WebSocket, message: any) {
           conversationMessages.push({
             role: 'tool',
             content: result.hasWebview
-              ? `${result.content}\n\n[Webview displayed to user]`
+              ? `${result.content}\n\n[IMPORTANT: An interactive webview has already been displayed to the user. DO NOT generate another webview. Just acknowledge the result in plain text.]`
               : JSON.stringify(result),
           });
 
