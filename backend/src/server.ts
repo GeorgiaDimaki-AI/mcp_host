@@ -436,20 +436,41 @@ async function handleChatMessage(ws: WebSocket, message: any) {
 
           console.log(`🔐 Requesting approval for tool: ${serverName}/${actualToolName}`);
 
-          // Wait for approval response
-          const approval = await new Promise<'allow-once' | 'decline' | 'allow-session'>((resolve) => {
+          // Wait for approval response with timeout and proper cleanup
+          const approval = await new Promise<'allow-once' | 'decline' | 'allow-session'>((resolve, reject) => {
+            const APPROVAL_TIMEOUT = 60000; // 60 seconds
+            let timeoutId: NodeJS.Timeout;
+
             const handler = (data: Buffer) => {
               try {
                 const response = JSON.parse(data.toString());
                 if (response.type === 'tool_approval_response' && response.requestId === approvalRequestId) {
+                  // Clean up handler and timeout
                   ws.off('message', handler);
+                  clearTimeout(timeoutId);
                   resolve(response.decision);
                 }
               } catch (error) {
                 // Ignore parsing errors
               }
             };
+
+            // Set up timeout to auto-decline after 60 seconds
+            timeoutId = setTimeout(() => {
+              ws.off('message', handler);
+              console.log(`⏱️  Tool approval timed out for: ${serverName}/${actualToolName}`);
+              resolve('decline');
+            }, APPROVAL_TIMEOUT);
+
+            // Register handler
             ws.on('message', handler);
+
+            // Clean up handler if WebSocket closes
+            ws.once('close', () => {
+              ws.off('message', handler);
+              clearTimeout(timeoutId);
+              reject(new Error('WebSocket closed during approval request'));
+            });
           });
 
           if (approval === 'decline') {

@@ -111,11 +111,14 @@ export class WebSocketService {
     this.reconnectAttempts++;
     console.log(`Reconnecting... (attempt ${this.reconnectAttempts})`);
 
+    // Bug #5: Cap delay at 30 seconds to prevent infinite growth
+    const delay = Math.min(this.reconnectDelay * this.reconnectAttempts, 30000);
+
     setTimeout(() => {
       this.connect().catch((error) => {
         console.error('Reconnection failed:', error);
       });
-    }, this.reconnectDelay * this.reconnectAttempts);
+    }, delay);
   }
 
   /**

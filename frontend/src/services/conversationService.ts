@@ -38,6 +38,7 @@ function generateTitle(messages: Message[]): string {
 
 /**
  * Get all conversations from localStorage
+ * Bug #11: Wrapped with proper error handling for localStorage operations
  */
 export function getAllConversations(): Conversation[] {
   try {
@@ -49,7 +50,7 @@ export function getAllConversations(): Conversation[] {
     // Sort by modified date descending (most recent first)
     return conversations.sort((a, b) => b.modified - a.modified);
   } catch (error) {
-    console.error('Failed to load conversations:', error);
+    console.error('Failed to load conversations (localStorage error):', error);
     return [];
   }
 }
@@ -64,6 +65,7 @@ export function getConversation(id: string): Conversation | null {
 
 /**
  * Create a new conversation
+ * Bug #11: Added error handling for localStorage operations
  */
 export function createConversation(
   model: string = 'llama3.2',
@@ -80,15 +82,21 @@ export function createConversation(
     settings,
   };
 
-  const conversations = getAllConversations();
-  conversations.push(conversation);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations));
+  try {
+    const conversations = getAllConversations();
+    conversations.push(conversation);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations));
+  } catch (error) {
+    console.error('Failed to save conversation to localStorage:', error);
+    // Still return the conversation even if save failed
+  }
 
   return conversation;
 }
 
 /**
  * Update an existing conversation
+ * Bug #11: Added error handling for localStorage operations
  */
 export function updateConversation(
   id: string,
@@ -120,13 +128,20 @@ export function updateConversation(
   }
 
   conversations[index] = updated;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations));
+
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations));
+  } catch (error) {
+    console.error('Failed to save conversation update to localStorage:', error);
+    // Still return the updated conversation even if save failed
+  }
 
   return updated;
 }
 
 /**
  * Delete a conversation
+ * Bug #11: Added error handling for localStorage operations
  */
 export function deleteConversation(id: string): boolean {
   const conversations = getAllConversations();
@@ -136,15 +151,25 @@ export function deleteConversation(id: string): boolean {
     return false; // Nothing was deleted
   }
 
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
-  return true;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+    return true;
+  } catch (error) {
+    console.error('Failed to delete conversation from localStorage:', error);
+    return false;
+  }
 }
 
 /**
  * Delete all conversations
+ * Bug #11: Added error handling for localStorage operations
  */
 export function deleteAllConversations(): void {
-  localStorage.removeItem(STORAGE_KEY);
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch (error) {
+    console.error('Failed to clear conversations from localStorage:', error);
+  }
 }
 
 /**
@@ -156,7 +181,52 @@ export function exportConversations(): string {
 }
 
 /**
+ * Export a single conversation as JSON
+ */
+export function exportConversationAsJSON(id: string): string | null {
+  const conversation = getConversation(id);
+  if (!conversation) return null;
+  return JSON.stringify(conversation, null, 2);
+}
+
+/**
+ * Export a single conversation as Markdown
+ */
+export function exportConversationAsMarkdown(id: string): string | null {
+  const conversation = getConversation(id);
+  if (!conversation) return null;
+
+  let markdown = `# ${conversation.title}\n\n`;
+  markdown += `**Model:** ${conversation.model}\n`;
+  markdown += `**Created:** ${new Date(conversation.created).toLocaleString()}\n`;
+  markdown += `**Modified:** ${new Date(conversation.modified).toLocaleString()}\n`;
+  markdown += `**Messages:** ${conversation.messages.length}\n\n`;
+  markdown += `---\n\n`;
+
+  conversation.messages.forEach((msg, index) => {
+    if (msg.role === 'user') {
+      markdown += `## 👤 User\n\n${msg.content}\n\n`;
+    } else if (msg.role === 'assistant') {
+      markdown += `## 🤖 Assistant\n\n${msg.content}\n\n`;
+    } else if (msg.role === 'system') {
+      markdown += `## ⚙️ System\n\n${msg.content}\n\n`;
+    }
+
+    if (msg.webview) {
+      markdown += `*[Interactive webview: ${msg.webview.type}]*\n\n`;
+    }
+
+    if (index < conversation.messages.length - 1) {
+      markdown += `---\n\n`;
+    }
+  });
+
+  return markdown;
+}
+
+/**
  * Import conversations from JSON
+ * Bug #11: Added error handling for localStorage operations
  */
 export function importConversations(json: string): number {
   try {
@@ -178,7 +248,13 @@ export function importConversations(json: string): number {
     });
 
     const unique = Array.from(uniqueMap.values());
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(unique));
+
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(unique));
+    } catch (storageError) {
+      console.error('Failed to save imported conversations to localStorage:', storageError);
+      throw new Error('Failed to save to localStorage: ' + (storageError as Error).message);
+    }
 
     return imported.length;
   } catch (error) {

@@ -9,7 +9,7 @@ import { WebSocketService } from '../../services/websocket';
 import { api } from '../../services/api';
 import { mcpApi } from '../../services/mcp-api';
 import { MessageList } from '../MessageList/MessageList';
-import { ChatInput } from './ChatInput';
+import { ChatInput, ChatInputRef } from './ChatInput';
 import { WebviewRenderer } from '../Webview/WebviewRenderer';
 import { ElicitationDialog, ElicitationRequest } from '../Elicitation/ElicitationDialog';
 import { ToolApprovalDialog, ToolApprovalRequest } from '../ToolApproval/ToolApprovalDialog';
@@ -21,6 +21,7 @@ import { ModelManager } from '../Settings/ModelManager';
 import { HelpModal } from '../HelpModal/HelpModal';
 import { ThemeToggle } from '../ThemeToggle/ThemeToggle';
 import { useMCPConfig } from '../../contexts/MCPConfigContext';
+import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 import {
   getAllConversations,
   createConversation,
@@ -44,6 +45,14 @@ export function Chat() {
   // Ref for streaming content auto-scroll
   const streamingContentRef = useRef<HTMLDivElement>(null);
 
+  // Ref for chat input to programmatically focus
+  const chatInputRef = useRef<ChatInputRef>(null);
+
+  // Refs to avoid stale closure bugs in WebSocket message handler (Bug #3)
+  const conversationsRef = useRef(conversations);
+  const currentConversationIdRef = useRef(currentConversationId);
+  const approvedToolsForSessionRef = useRef(approvedToolsForSession);
+
   // Current conversation derived state
   const currentConversation = conversations.find(c => c.id === currentConversationId) || null;
   const messages = currentConversation?.messages || [];
@@ -56,6 +65,9 @@ export function Chat() {
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [availableMcpServers, setAvailableMcpServers] = useState<string[]>([]);
   const [streamingContent, setStreamingContent] = useState('');
+  const [currentRequestId, setCurrentRequestId] = useState<string | null>(null);
+  const [lastError, setLastError] = useState<string | null>(null);
+  const [lastUserMessage, setLastUserMessage] = useState<string>('');
 
   // MCP-specific state
   const [mcpWebviews, setMcpWebviews] = useState<MCPWebviewDisplay[]>([]);
@@ -78,6 +90,38 @@ export function Chat() {
 
   // MCP configuration context
   const { getTrustLevel, reload: reloadMcpConfig } = useMCPConfig();
+
+  // Keyboard shortcuts
+  useKeyboardShortcuts({
+    onNewConversation: handleCreateConversation,
+    onToggleSidebar: () => setSidebarCollapsed(prev => !prev),
+    onClearConversation: () => {
+      if (currentConversationId && messages.length > 0) {
+        const confirmed = window.confirm('Clear all messages in this conversation?');
+        if (confirmed) {
+          updateMessages([]);
+        }
+      }
+    },
+    onFocusInput: () => chatInputRef.current?.focus(),
+    onEscape: () => {
+      // Close any open modals/dialogs
+      if (showMcpSettings) setShowMcpSettings(false);
+      else if (showModelSettings) setShowModelSettings(false);
+      else if (showModelManager) setShowModelManager(false);
+      else if (showSummary) setShowSummary(false);
+      else if (showHelpModal) setShowHelpModal(false);
+      else if (activeElicitation) setActiveElicitation(null);
+      else if (activeToolApproval) setActiveToolApproval(null);
+    },
+  });
+
+  // Keep refs in sync to avoid stale closures (Bug #3)
+  useEffect(() => {
+    conversationsRef.current = conversations;
+    currentConversationIdRef.current = currentConversationId;
+    approvedToolsForSessionRef.current = approvedToolsForSession;
+  }, [conversations, currentConversationId, approvedToolsForSession]);
 
   // Load conversations on mount
   useEffect(() => {
@@ -213,6 +257,7 @@ export function Chat() {
       case 'chat_start':
         setIsLoading(true);
         setStreamingContent('');
+        setCurrentRequestId((message as any).requestId || null);
         break;
 
       case 'chat_chunk':
@@ -227,12 +272,16 @@ export function Chat() {
           addAssistantMessage(message.fullContent);
         }
         setStreamingContent('');
+        setCurrentRequestId(null);
         break;
 
       case 'error':
         setIsLoading(false);
-        addSystemMessage(`Error: ${message.error}`);
+        const errorMsg = message.error || 'An unknown error occurred';
+        setLastError(errorMsg);
+        addSystemMessage(`Error: ${errorMsg}`);
         setStreamingContent('');
+        setCurrentRequestId(null);
         break;
 
       case 'elicitation-request':
@@ -266,17 +315,19 @@ export function Chat() {
         const serverName = approvalMsg.serverName;
 
         console.log('[Tool Approval] Request received for server:', serverName, 'tool:', approvalMsg.toolName);
-        console.log('[Tool Approval] Currently approved servers:', Array.from(approvedToolsForSession));
+        console.log('[Tool Approval] Currently approved servers:', Array.from(approvedToolsForSessionRef.current));
 
-        // Check if entire server is already approved for session
-        if (approvedToolsForSession.has(serverName)) {
+        // Check if entire server is already approved for session (use ref to avoid stale closure - Bug #3)
+        if (approvedToolsForSessionRef.current.has(serverName)) {
           console.log('[Tool Approval] Auto-approving - server already trusted:', serverName);
-          // Auto-approve
-          wsService.send({
-            type: 'tool_approval_response',
-            requestId: approvalMsg.requestId,
-            decision: 'allow-session',
-          });
+          // Auto-approve (Bug #14: Check connection before sending)
+          if (wsService.isConnected()) {
+            wsService.send({
+              type: 'tool_approval_response',
+              requestId: approvalMsg.requestId,
+              decision: 'allow-session',
+            });
+          }
         } else {
           console.log('[Tool Approval] Showing approval dialog for:', serverName, '/', approvalMsg.toolName);
           // Show approval dialog
@@ -309,9 +360,10 @@ export function Chat() {
             },
           };
 
-          // Get current messages from conversation to avoid stale closure
-          if (!currentConversationId) return;
-          const currentConv = conversations.find(c => c.id === currentConversationId);
+          // Use ref to get current conversation ID to avoid race condition (Bug #4)
+          const convId = currentConversationIdRef.current;
+          if (!convId) return;
+          const currentConv = conversationsRef.current.find(c => c.id === convId);
           if (currentConv) {
             updateMessages([...currentConv.messages, webviewMessage]);
           }
@@ -379,8 +431,53 @@ export function Chat() {
     }
   };
 
+  const handleStopGeneration = () => {
+    if (currentRequestId) {
+      wsService.send({ type: 'cancel' as any, requestId: currentRequestId });
+      setIsLoading(false);
+      setStreamingContent('');
+      setCurrentRequestId(null);
+      addSystemMessage('Generation stopped by user');
+    }
+  };
+
+  const handleRegenerate = (messageId: string) => {
+    // Find the message to regenerate
+    const messageIndex = messages.findIndex(m => m.id === messageId);
+    if (messageIndex === -1) return;
+
+    // Find the previous user message
+    let userMessageIndex = -1;
+    for (let i = messageIndex - 1; i >= 0; i--) {
+      if (messages[i].role === 'user') {
+        userMessageIndex = i;
+        break;
+      }
+    }
+
+    if (userMessageIndex === -1) {
+      addSystemMessage('Cannot regenerate: no previous user message found');
+      return;
+    }
+
+    const userMessage = messages[userMessageIndex];
+
+    // Remove the assistant message and any messages after it
+    const newMessages = messages.slice(0, messageIndex);
+    updateMessages(newMessages);
+
+    // Resend the user message
+    handleSendMessage(userMessage.content);
+  };
+
   const handleSendMessage = useCallback((content: string) => {
     if (!currentConversationId) return;
+
+    // Clear any previous errors
+    setLastError(null);
+
+    // Save the user message for potential retry
+    setLastUserMessage(content);
 
     // Add user message to UI
     const userMessage: Message = {
@@ -472,14 +569,22 @@ ALWAYS with triple backticks and webview:type!`;
         : `You are a helpful AI assistant with the ability to render interactive HTML content.${webviewInstructions}`,
     };
 
-    wsService.send({
-      type: 'chat',
-      messages: [systemPrompt, ...conversationMessages],
-      model: currentModel,
-      mcpServer: currentMcpServer, // Send selected MCP server to enable tool calling
-      options: modelSettings,
-    });
-  }, [messages, currentModel, modelSettings, currentMcpServer, currentConversationId]);
+    try {
+      wsService.send({
+        type: 'chat',
+        messages: [systemPrompt, ...conversationMessages],
+        model: currentModel,
+        mcpServer: currentMcpServer, // Send selected MCP server to enable tool calling
+        options: modelSettings,
+      });
+    } catch (error) {
+      console.error('Error sending message:', error);
+      setIsLoading(false);
+      const errorMsg = error instanceof Error ? error.message : 'Failed to send message';
+      setLastError(errorMsg);
+      addSystemMessage(`Error: ${errorMsg}`);
+    }
+  }, [messages, currentModel, modelSettings, currentMcpServer, currentConversationId, addSystemMessage]);
 
   const handleWebviewMessage = (messageId: string, data: any) => {
     console.log('Webview message from', messageId, ':', data);
@@ -595,25 +700,37 @@ ALWAYS with triple backticks and webview:type!`;
   const handleElicitationResponse = (response: { action: 'accept' | 'decline' | 'cancel'; content?: Record<string, any> }) => {
     if (!activeElicitation) return;
 
-    if (response.action === 'accept' && response.content) {
-      // Send response via WebSocket
-      wsService.send({
-        type: 'elicitation-response',
-        requestId: activeElicitation.requestId,
-        response: {
-          accepted: true,
-          data: response.content,
-        },
-      });
+    // Bug #13: Validate response content before sending
+    if (response.action === 'accept') {
+      if (!response.content || typeof response.content !== 'object') {
+        console.error('Invalid elicitation response: content is required for accept action');
+        addSystemMessage('Error: Invalid elicitation response');
+        setActiveElicitation(null);
+        return;
+      }
+
+      // Send accept response via WebSocket (Bug #14: Check connection)
+      if (wsService.isConnected()) {
+        wsService.send({
+          type: 'elicitation-response',
+          requestId: activeElicitation.requestId,
+          response: {
+            accepted: true,
+            data: response.content,
+          },
+        });
+      }
     } else {
-      // User declined or cancelled
-      wsService.send({
-        type: 'elicitation-response',
-        requestId: activeElicitation.requestId,
-        response: {
-          accepted: false,
-        },
-      });
+      // User declined or cancelled (Bug #14: Check connection)
+      if (wsService.isConnected()) {
+        wsService.send({
+          type: 'elicitation-response',
+          requestId: activeElicitation.requestId,
+          response: {
+            accepted: false,
+          },
+        });
+      }
     }
 
     setActiveElicitation(null);
@@ -644,12 +761,14 @@ ALWAYS with triple backticks and webview:type!`;
       });
     }
 
-    // Send response via WebSocket
-    wsService.send({
-      type: 'tool_approval_response',
-      requestId: activeToolApproval.requestId,
-      decision,
-    });
+    // Send response via WebSocket (Bug #14: Check connection before sending)
+    if (wsService.isConnected()) {
+      wsService.send({
+        type: 'tool_approval_response',
+        requestId: activeToolApproval.requestId,
+        decision,
+      });
+    }
 
     setActiveToolApproval(null);
   };
@@ -1062,20 +1181,67 @@ ALWAYS with triple backticks and webview:type!`;
           messages={messages}
           isLoading={isLoading}
           onWebviewMessage={handleWebviewMessage}
+          onRegenerate={handleRegenerate}
         />
 
         {/* Streaming preview */}
         {streamingContent && (
           <div className="px-4 py-2 bg-background-secondary border-t border-border">
-            <div className="max-w-4xl mx-auto">
-              <div className="text-xs text-primary-600 font-medium mb-1">Assistant is typing...</div>
-              <div ref={streamingContentRef} className="text-sm text-text-secondary max-h-64 overflow-y-auto">{streamingContent}</div>
+            <div className="max-w-4xl mx-auto flex items-start justify-between gap-4">
+              <div className="flex-1 min-w-0">
+                <div className="text-xs text-primary-600 font-medium mb-1">Assistant is typing...</div>
+                <div ref={streamingContentRef} className="text-sm text-text-secondary max-h-64 overflow-y-auto">{streamingContent}</div>
+              </div>
+              <button
+                onClick={handleStopGeneration}
+                className="flex-shrink-0 px-3 py-1.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-medium flex items-center gap-1.5"
+                title="Stop generation"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                Stop
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Error Display with Retry */}
+        {lastError && (
+          <div className="px-4 py-3 bg-red-50 border-t border-red-200">
+            <div className="max-w-4xl mx-auto flex items-start gap-3">
+              <div className="flex-shrink-0 w-5 h-5 bg-red-100 rounded-full flex items-center justify-center mt-0.5">
+                <svg className="w-3 h-3 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-red-800 mb-1">Error</p>
+                <p className="text-sm text-red-700">{lastError}</p>
+              </div>
+              <div className="flex gap-2">
+                {lastUserMessage && (
+                  <button
+                    onClick={() => handleSendMessage(lastUserMessage)}
+                    className="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+                  >
+                    Retry
+                  </button>
+                )}
+                <button
+                  onClick={() => setLastError(null)}
+                  className="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-sm font-medium"
+                >
+                  Dismiss
+                </button>
+              </div>
             </div>
           </div>
         )}
 
         {/* Input */}
         <ChatInput
+          ref={chatInputRef}
           onSend={handleSendMessage}
           disabled={!isConnected || isLoading}
           placeholder={

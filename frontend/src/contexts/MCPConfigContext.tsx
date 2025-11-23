@@ -29,7 +29,8 @@ export function MCPConfigProvider({ children }: { children: ReactNode }) {
 
   const loadConfig = async () => {
     try {
-      const response = await fetch('http://localhost:3000/api/mcp/config');
+      // Bug #12: Use relative URL instead of hardcoded localhost
+      const response = await fetch('/api/mcp/config');
       if (!response.ok) {
         console.error('Failed to load MCP configuration');
         return;
