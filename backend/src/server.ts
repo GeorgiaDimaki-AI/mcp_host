@@ -408,6 +408,18 @@ async function handleChatMessage(ws: WebSocket, message: any) {
           hasToolCalls = true;
           toolCalls = chunk.data as OllamaToolCall[];
           console.log(`🔧 Tool calls detected: ${toolCalls.length} tool(s)`);
+
+          // Clear the streamed content from frontend since it was just "thinking" text
+          // The actual tool result will be displayed instead
+          ws.send(JSON.stringify({
+            type: 'clear_streaming',
+            timestamp: Date.now(),
+          }));
+
+          // Remove the tool-call iteration content from fullResponse
+          // since it's not the final answer
+          fullResponse = fullResponse.substring(0, fullResponse.length - iterationContent.length);
+
           break; // Stop streaming when tool calls are detected
         }
       }

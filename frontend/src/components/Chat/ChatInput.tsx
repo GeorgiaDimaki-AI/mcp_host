@@ -7,8 +7,10 @@ import { useState, KeyboardEvent, useRef, useEffect, forwardRef, useImperativeHa
 
 interface ChatInputProps {
   onSend: (message: string) => void;
+  onStop?: () => void;
   disabled?: boolean;
   placeholder?: string;
+  isGenerating?: boolean;
 }
 
 export interface ChatInputRef {
@@ -16,7 +18,7 @@ export interface ChatInputRef {
 }
 
 export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
-  function ChatInput({ onSend, disabled, placeholder }, ref) {
+  function ChatInput({ onSend, onStop, disabled, placeholder, isGenerating = false }, ref) {
     const [input, setInput] = useState('');
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -68,19 +70,37 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
             text-sm
           "
         />
-        <button
-          onClick={handleSend}
-          disabled={disabled || !input.trim()}
-          className="
-            px-6 py-3 bg-blue-500 text-white rounded-lg font-medium
-            hover:bg-blue-600 active:bg-blue-700
-            disabled:bg-gray-300 disabled:cursor-not-allowed
-            transition-colors
-            text-sm
-          "
-        >
-          Send
-        </button>
+        {isGenerating ? (
+          <button
+            onClick={onStop}
+            className="
+              px-6 py-3 bg-red-500 text-white rounded-lg font-medium
+              hover:bg-red-600 active:bg-red-700
+              transition-colors
+              text-sm flex items-center gap-2
+            "
+            title="Stop generation"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            Stop
+          </button>
+        ) : (
+          <button
+            onClick={handleSend}
+            disabled={disabled || !input.trim()}
+            className="
+              px-6 py-3 bg-blue-500 text-white rounded-lg font-medium
+              hover:bg-blue-600 active:bg-blue-700
+              disabled:bg-gray-300 disabled:cursor-not-allowed
+              transition-colors
+              text-sm
+            "
+          >
+            Send
+          </button>
+        )}
       </div>
       <div className="text-xs text-text-tertiary mt-2 text-center">
         Press Enter to send, Shift+Enter for new line • Cmd/Ctrl+K: New chat • Cmd/Ctrl+/: Toggle sidebar

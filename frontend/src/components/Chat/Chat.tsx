@@ -277,6 +277,12 @@ export function Chat() {
         }
         break;
 
+      case 'clear_streaming':
+        // Clear streaming content when tool calls are detected
+        // This prevents showing the model's "thinking" text before tool execution
+        setStreamingContent('');
+        break;
+
       case 'chat_complete':
         setIsLoading(false);
         if (message.fullContent) {
@@ -1191,24 +1197,12 @@ ALWAYS with triple backticks and webview:type!`;
           onRegenerate={handleRegenerate}
         />
 
-        {/* Streaming preview */}
+        {/* Streaming preview - without stop button (now in ChatInput) */}
         {streamingContent && (
           <div className="px-4 py-2 bg-background-secondary border-t border-border">
-            <div className="max-w-4xl mx-auto flex items-start justify-between gap-4">
-              <div className="flex-1 min-w-0">
-                <div className="text-xs text-primary-600 font-medium mb-1">Assistant is typing...</div>
-                <div ref={streamingContentRef} className="text-sm text-text-secondary max-h-64 overflow-y-auto">{streamingContent}</div>
-              </div>
-              <button
-                onClick={handleStopGeneration}
-                className="flex-shrink-0 px-3 py-1.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-medium flex items-center gap-1.5"
-                title="Stop generation"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-                Stop
-              </button>
+            <div className="max-w-4xl mx-auto">
+              <div className="text-xs text-primary-600 font-medium mb-1">Assistant is typing...</div>
+              <div ref={streamingContentRef} className="text-sm text-text-secondary max-h-64 overflow-y-auto">{streamingContent}</div>
             </div>
           </div>
         )}
@@ -1250,6 +1244,8 @@ ALWAYS with triple backticks and webview:type!`;
         <ChatInput
           ref={chatInputRef}
           onSend={handleSendMessage}
+          onStop={handleStopGeneration}
+          isGenerating={isLoading && !!streamingContent}
           disabled={!isConnected || isLoading}
           placeholder={
             !isConnected

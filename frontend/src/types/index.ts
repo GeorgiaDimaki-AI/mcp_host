@@ -35,7 +35,7 @@ export interface ChatState {
 }
 
 export interface WebSocketMessage {
-  type: 'connected' | 'chat_start' | 'chat_chunk' | 'chat_complete' | 'error' | 'pong' | 'elicitation-request' | 'elicitation-complete' | 'mcp-notification' | 'tool_execution' | 'tool_approval_request';
+  type: 'connected' | 'chat_start' | 'chat_chunk' | 'chat_complete' | 'error' | 'pong' | 'elicitation-request' | 'elicitation-complete' | 'mcp-notification' | 'tool_execution' | 'tool_approval_request' | 'clear_streaming' | 'chat_cancelled';
   content?: string;
   fullContent?: string;
   message?: string;
