@@ -1,6 +1,6 @@
 {
   "name": "@gdimaki-ai/mcp-webview-host",
-  "version": "0.5.0-beta",
+  "version": "0.6.0-beta",
   "description": "Secure webview host for Model Context Protocol (MCP) servers with elicitation support",
   "main": "backend/dist/server.js",
   "bin": {

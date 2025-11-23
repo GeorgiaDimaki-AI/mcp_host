@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- No unreleased features yet
+
+### Fixed
+
+- No unreleased fixes yet
+
+### Changed
+
+- No unreleased changes yet
+
+## [0.6.0-beta] - 2025-11-23
+
+### Added
+
 - **Light/Dark Mode Theme System**
   - Three-mode theme support: light, dark, and system
   - System preference detection via `prefers-color-scheme` media query
@@ -82,6 +96,161 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Deprecated
 
 - Direct HTML in conversation titles (now auto-generated)
+
+## [0.5.0-beta] - 2025-11-23
+
+### Added
+
+- **Restaurant MCP Server Example** - La Maison Élégante
+  - Interactive restaurant reservation system
+  - Menu viewing with photos and descriptions
+  - Wine pairing recommendations
+  - Chef's special and daily features
+  - Secure payment form demonstration
+  - Complete example MCP server implementation
+
+- **Stop/Cancel Generation**
+  - Stop button to cancel ongoing LLM generation
+  - Clean cancellation of streaming responses
+  - Improved UX during long-running queries
+
+- **Auto-scroll to Streaming Content**
+  - Automatic scrolling to show latest generated text
+  - Smooth scrolling behavior during streaming
+  - Better visibility of AI responses
+
+- **Senior Engineer Review Documentation**
+  - Comprehensive code review and analysis
+  - Architecture assessment
+  - Security evaluation
+  - Performance recommendations
+
+### Fixed
+
+- **Form Submission Flicker**
+  - Fixed visual flicker when submitting forms in webviews
+  - Improved form state management
+  - Smoother user experience
+
+- **Direct Backend POST for Forms**
+  - Forms now POST directly to backend
+  - Sensitive data bypasses chat interface
+  - Improved security for form submissions
+
+- **MCP Tool Calling with System Prompts**
+  - Improved system prompts for better tool calling
+  - More reliable tool execution
+  - Better context handling
+
+- **Chat Summary Text Visibility in Dark Mode**
+  - Fixed contrast issues in dark mode
+  - Improved readability
+  - Better color accessibility
+
+- **Assistant Typing Indicator**
+  - Made typing indicator scrollable
+  - Fixed position issues
+  - Better visual feedback
+
+### Changed
+
+- **README Improvements**
+  - Updated documentation
+  - Better examples and use cases
+  - Clearer installation instructions
+
+## [0.4.0-beta] - 2025-11-22
+
+### Added
+
+- **Tool Approval System**
+  - Per-conversation tool approval settings
+  - User control over MCP tool execution
+  - Approval prompts for sensitive operations
+  - Configurable approval preferences
+
+### Fixed
+
+- **Dark Mode Issues**
+  - Fixed color contrast in dark mode
+  - Improved visibility of UI elements
+  - Better theme consistency
+
+- **Tool Approval UX**
+  - Improved button styling
+  - Better approval flow
+  - Clearer user feedback
+
+### Changed
+
+- **Message Suppression**
+  - Suppress duplicate messages after webview display
+  - Cleaner chat history
+  - Better message flow management
+
+## [0.3.0-beta] - 2025-11-22
+
+### Added
+
+- **Light/Dark Mode Foundation**
+  - Initial theme system implementation
+  - Theme toggle UI component
+  - Theme persistence via localStorage
+
+- **Inline Conversation Title Editing**
+  - Edit conversation titles directly in sidebar
+  - Real-time title updates
+  - Better conversation organization
+
+- **MCP Developer Documentation**
+  - Comprehensive help modal
+  - Tool listing and information
+  - Developer guidance for creating MCP servers
+
+- **Comprehensive Test Suite**
+  - Theme system tests
+  - MCP resource handling tests
+  - Conversation title tests
+  - Improved test coverage
+
+### Fixed
+
+- **MCP Tool Calling**
+  - Implemented complete tool execution loop
+  - Fixed TypeScript build errors
+  - Better error handling
+
+- **MCP Resource Handling**
+  - Extract webview HTML from resource blocks correctly
+  - Improved resource parsing
+  - Better webview display
+
+- **Stale Closure in Tool Execution**
+  - Fixed closure issues in WebSocket handlers
+  - Improved state management
+  - More reliable tool execution
+
+- **Theme Colors**
+  - Fixed dark mode color palette
+  - Improved contrast ratios
+  - Better accessibility
+
+- **Duplicate Webviews**
+  - Prevent LLM from generating duplicate webviews
+  - Better webview state management
+  - Cleaner user experience
+
+### Changed
+
+- **MCP Info Display**
+  - Replaced "MCP Tools" button with comprehensive "MCP Info"
+  - Enhanced server information display
+  - Better tool documentation
+
+- **Webview Instructions**
+  - Improved guidance for webview usage
+  - Better user onboarding
+  - Clearer documentation
 
 ## [0.2.0-beta] - 2025-11-22
 
