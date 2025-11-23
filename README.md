@@ -25,6 +25,9 @@ That's it! The server will start and open in your browser automatically.
 - ⚡ **Real-time Updates** - WebSocket-based communication
 - 🎨 **Modern UI** - React + TypeScript + Tailwind CSS
 - ✅ **Well Tested** - 126 tests covering all security features
+- 🌓 **Light/Dark Mode** - Theme support with system preference detection
+- 🏷️ **Intelligent Conversation Titles** - Auto-generated from first message
+- 🛠️ **Full MCP Tool Calling** - LLM can directly execute MCP tools
 
 ## Architecture
 

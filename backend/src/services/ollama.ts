@@ -3,9 +3,22 @@
  * Handles communication with local Ollama instance
  */
 
+export interface OllamaToolCall {
+  function: {
+    name: string;
+    arguments: Record<string, any>;
+  };
+}
+
 export interface OllamaMessage {
-  role: 'system' | 'user' | 'assistant';
+  role: 'system' | 'user' | 'assistant' | 'tool';
   content: string;
+  tool_calls?: OllamaToolCall[];
+}
+
+export interface ChatStreamChunk {
+  type: 'content' | 'tool_calls';
+  data: string | OllamaToolCall[];
 }
 
 export interface OllamaGenerateRequest {
@@ -95,9 +108,9 @@ export class OllamaService {
 
   /**
    * Chat completion (streaming)
-   * Returns an async generator that yields response chunks
+   * Returns an async generator that yields response chunks (content or tool calls)
    */
-  async *chatStream(request: OllamaChatRequest): AsyncGenerator<string> {
+  async *chatStream(request: OllamaChatRequest): AsyncGenerator<ChatStreamChunk> {
     try {
       const response = await fetch(`${this.baseUrl}/api/chat`, {
         method: 'POST',
@@ -129,8 +142,20 @@ export class OllamaService {
           if (line.trim()) {
             try {
               const data = JSON.parse(line);
-              if (data.message?.content) {
-                yield data.message.content;
+
+              // Check for tool calls first (they take precedence)
+              if (data.message?.tool_calls && data.message.tool_calls.length > 0) {
+                yield {
+                  type: 'tool_calls',
+                  data: data.message.tool_calls,
+                };
+              }
+              // Otherwise yield content if available
+              else if (data.message?.content) {
+                yield {
+                  type: 'content',
+                  data: data.message.content,
+                };
               }
             } catch (e) {
               console.error('Error parsing JSON line:', e);

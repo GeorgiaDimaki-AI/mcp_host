@@ -88,18 +88,18 @@ export function ModelSettings({
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto"
+        className="bg-background-secondary rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="border-b border-gray-200 px-6 py-4">
+        <div className="border-b border-border px-6 py-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-gray-900">
+            <h2 className="text-xl font-semibold text-text-primary">
               Model Settings
             </h2>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
+              className="text-gray-400 hover:text-text-secondary transition-colors"
               aria-label="Close"
             >
               <svg
@@ -117,7 +117,7 @@ export function ModelSettings({
               </svg>
             </button>
           </div>
-          <p className="text-sm text-gray-600 mt-1">
+          <p className="text-sm text-text-secondary mt-1">
             Configure model and generation settings for this conversation
           </p>
         </div>
@@ -128,7 +128,7 @@ export function ModelSettings({
           <div>
             <label
               htmlFor="model-select"
-              className="block text-sm font-medium text-gray-700 mb-2"
+              className="block text-sm font-medium text-text-secondary mb-2"
             >
               Model
             </label>
@@ -136,7 +136,7 @@ export function ModelSettings({
               id="model-select"
               value={selectedModel}
               onChange={(e) => setSelectedModel(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-border-dark rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               {availableModels.length === 0 ? (
                 <option value="">No models available</option>
@@ -148,7 +148,7 @@ export function ModelSettings({
                 ))
               )}
             </select>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-text-tertiary mt-1">
               The language model to use for this conversation
             </p>
           </div>
@@ -157,7 +157,7 @@ export function ModelSettings({
           <div>
             <label
               htmlFor="temperature-slider"
-              className="block text-sm font-medium text-gray-700 mb-2"
+              className="block text-sm font-medium text-text-secondary mb-2"
             >
               Temperature: <span className="text-blue-600">{temperature.toFixed(2)}</span>
             </label>
@@ -169,14 +169,14 @@ export function ModelSettings({
               step="0.01"
               value={temperature}
               onChange={(e) => setTemperature(parseFloat(e.target.value))}
-              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
+              className="w-full h-2 bg-surface rounded-lg appearance-none cursor-pointer accent-blue-500"
             />
-            <div className="flex justify-between text-xs text-gray-500 mt-1">
+            <div className="flex justify-between text-xs text-text-tertiary mt-1">
               <span>0 (Focused)</span>
               <span>1 (Balanced)</span>
               <span>2 (Creative)</span>
             </div>
-            <p className="text-xs text-gray-500 mt-2">
+            <p className="text-xs text-text-tertiary mt-2">
               Controls randomness. Lower values make output more focused and
               deterministic. Higher values make output more creative and random.
             </p>
@@ -186,7 +186,7 @@ export function ModelSettings({
           <div>
             <label
               htmlFor="top-p-slider"
-              className="block text-sm font-medium text-gray-700 mb-2"
+              className="block text-sm font-medium text-text-secondary mb-2"
             >
               Top P (Nucleus Sampling): <span className="text-blue-600">{topP.toFixed(2)}</span>
             </label>
@@ -198,14 +198,14 @@ export function ModelSettings({
               step="0.01"
               value={topP}
               onChange={(e) => setTopP(parseFloat(e.target.value))}
-              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
+              className="w-full h-2 bg-surface rounded-lg appearance-none cursor-pointer accent-blue-500"
             />
-            <div className="flex justify-between text-xs text-gray-500 mt-1">
+            <div className="flex justify-between text-xs text-text-tertiary mt-1">
               <span>0.0</span>
               <span>0.5</span>
               <span>1.0</span>
             </div>
-            <p className="text-xs text-gray-500 mt-2">
+            <p className="text-xs text-text-tertiary mt-2">
               Controls diversity via nucleus sampling. Lower values make output
               more focused, higher values make output more diverse.
             </p>
@@ -215,7 +215,7 @@ export function ModelSettings({
           <div>
             <label
               htmlFor="top-k-slider"
-              className="block text-sm font-medium text-gray-700 mb-2"
+              className="block text-sm font-medium text-text-secondary mb-2"
             >
               Top K: <span className="text-blue-600">{topK}</span>
             </label>
@@ -227,24 +227,24 @@ export function ModelSettings({
               step="1"
               value={topK}
               onChange={(e) => setTopK(parseInt(e.target.value))}
-              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
+              className="w-full h-2 bg-surface rounded-lg appearance-none cursor-pointer accent-blue-500"
             />
-            <div className="flex justify-between text-xs text-gray-500 mt-1">
+            <div className="flex justify-between text-xs text-text-tertiary mt-1">
               <span>1</span>
               <span>50</span>
               <span>100</span>
             </div>
-            <p className="text-xs text-gray-500 mt-2">
+            <p className="text-xs text-text-tertiary mt-2">
               Limits the number of highest probability tokens to consider.
               Lower values make output more focused.
             </p>
           </div>
 
           {/* System Prompt Preset */}
-          <div className="border-t border-gray-200 pt-6">
+          <div className="border-t border-border pt-6">
             <label
               htmlFor="preset-select"
-              className="block text-sm font-medium text-gray-700 mb-2"
+              className="block text-sm font-medium text-text-secondary mb-2"
             >
               System Prompt Preset
             </label>
@@ -252,7 +252,7 @@ export function ModelSettings({
               id="preset-select"
               value={selectedPreset}
               onChange={(e) => handlePresetChange(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full px-3 py-2 border border-border-dark rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
               <option value="custom">Custom / None</option>
               {PROMPT_PRESETS.map((preset) => (
@@ -262,7 +262,7 @@ export function ModelSettings({
               ))}
             </select>
             {selectedPreset !== 'custom' && (
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-text-tertiary mt-1">
                 {PROMPT_PRESETS.find(p => p.id === selectedPreset)?.description}
               </p>
             )}
@@ -272,7 +272,7 @@ export function ModelSettings({
           <div>
             <label
               htmlFor="system-prompt"
-              className="block text-sm font-medium text-gray-700 mb-2"
+              className="block text-sm font-medium text-text-secondary mb-2"
             >
               Custom System Prompt
             </label>
@@ -285,9 +285,9 @@ export function ModelSettings({
               }}
               rows={6}
               placeholder="Enter a custom system prompt to customize the model's behavior..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
+              className="w-full px-3 py-2 border border-border-dark rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
             />
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-text-tertiary mt-1">
               The system prompt defines the model's role and behavior. Select a preset above or write your own.
             </p>
           </div>
@@ -321,17 +321,17 @@ export function ModelSettings({
         </div>
 
         {/* Footer */}
-        <div className="border-t border-gray-200 px-6 py-4 bg-gray-50 flex justify-between gap-3">
+        <div className="border-t border-border px-6 py-4 bg-background-primary flex justify-between gap-3">
           <button
             onClick={handleReset}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            className="px-4 py-2 text-sm font-medium text-text-secondary bg-background-secondary border border-border-dark rounded-lg hover:bg-background-primary transition-colors"
           >
             Reset to Defaults
           </button>
           <div className="flex gap-3">
             <button
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              className="px-4 py-2 text-sm font-medium text-text-secondary bg-background-secondary border border-border-dark rounded-lg hover:bg-background-primary transition-colors"
             >
               Cancel
             </button>

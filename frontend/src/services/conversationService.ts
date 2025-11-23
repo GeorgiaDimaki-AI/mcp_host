@@ -4,6 +4,7 @@
  */
 
 import { Message } from '../types';
+import { generateTitle as generateTitleFromMessage } from '../utils/titleGenerator';
 
 export interface ModelSettings {
   temperature?: number;
@@ -24,22 +25,14 @@ export interface Conversation {
 }
 
 const STORAGE_KEY = 'mcp_conversations';
-const MAX_TITLE_LENGTH = 50;
 
 /**
- * Generate a title from the first user message
+ * Generate a title from messages using intelligent title generation
  */
 function generateTitle(messages: Message[]): string {
   const firstUserMessage = messages.find((m) => m.role === 'user');
-  if (!firstUserMessage) {
-    return 'New Conversation';
-  }
-
-  const title = firstUserMessage.content.trim();
-  if (title.length > MAX_TITLE_LENGTH) {
-    return title.substring(0, MAX_TITLE_LENGTH) + '...';
-  }
-  return title || 'New Conversation';
+  const existingTitles = getAllConversations().map(c => c.title);
+  return generateTitleFromMessage(firstUserMessage?.content, existingTitles);
 }
 
 /**

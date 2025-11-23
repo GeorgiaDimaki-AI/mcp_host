@@ -18,6 +18,7 @@ import { Sidebar } from '../Sidebar/Sidebar';
 import { ModelSettings } from '../Settings/ModelSettings';
 import { ModelManager } from '../Settings/ModelManager';
 import { HelpModal } from '../HelpModal/HelpModal';
+import { ThemeToggle } from '../ThemeToggle/ThemeToggle';
 import { useMCPConfig } from '../../contexts/MCPConfigContext';
 import {
   getAllConversations,
@@ -587,6 +588,15 @@ ALWAYS with triple backticks and webview:type!`;
     }
   };
 
+  const handleUpdateConversation = (id: string, updates: Partial<Conversation>) => {
+    const updated = updateConversation(id, updates);
+    if (updated) {
+      setConversations(prev =>
+        prev.map(c => (c.id === id ? updated : c))
+      );
+    }
+  };
+
   const handleSaveModelSettings = (model: string, settings: ModelSettingsType) => {
     if (!currentConversationId) return;
 
@@ -616,7 +626,7 @@ ALWAYS with triple backticks and webview:type!`;
   };
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-background-primary">
       {/* Sidebar */}
       <Sidebar
         conversations={conversations}
@@ -626,23 +636,24 @@ ALWAYS with triple backticks and webview:type!`;
         onSelectConversation={handleSelectConversation}
         onCreateConversation={handleCreateConversation}
         onDeleteConversation={handleDeleteConversation}
+        onUpdateConversation={handleUpdateConversation}
         onConversationsImported={handleConversationsImported}
       />
 
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col">
         {/* Header */}
-        <div className="bg-white border-b border-gray-200 px-4 py-3">
+        <div className="bg-background-secondary border-b border-border px-4 py-3">
           <div className="flex items-center justify-between max-w-6xl mx-auto">
             <div className="flex items-center gap-3">
-              <h1 className="text-lg font-semibold text-gray-900">
+              <h1 className="text-lg font-semibold text-text-primary">
                 {currentConversation?.title || 'LLM Webview Client'}
               </h1>
               <div className="flex items-center gap-1.5" title={isConnected ? 'Connected' : 'Disconnected'}>
                 <div className={`w-2 h-2 rounded-full ${
                   isConnected ? 'bg-green-500' : 'bg-red-500'
                 }`}></div>
-                <span className="text-xs text-gray-600">
+                <span className="text-xs text-text-secondary">
                   {isConnected ? 'Connected' : 'Disconnected'}
                 </span>
               </div>
@@ -652,19 +663,19 @@ ALWAYS with triple backticks and webview:type!`;
               {/* Demo buttons */}
               <button
                 onClick={sendDemoForm}
-                className="px-3 py-1.5 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
+                className="px-3 py-1.5 text-xs bg-surface text-text-secondary rounded hover:bg-surface-hover transition-colors"
               >
                 Demo Form
               </button>
               <button
                 onClick={sendDemoChart}
-                className="px-3 py-1.5 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
+                className="px-3 py-1.5 text-xs bg-surface text-text-secondary rounded hover:bg-surface-hover transition-colors"
               >
                 Demo Chart
               </button>
               <button
                 onClick={sendDemoCalculator}
-                className="px-3 py-1.5 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
+                className="px-3 py-1.5 text-xs bg-surface text-text-secondary rounded hover:bg-surface-hover transition-colors"
               >
                 Demo Calc
               </button>
@@ -682,26 +693,26 @@ ALWAYS with triple backticks and webview:type!`;
                         handleSaveModelSettings(value, modelSettings);
                       }
                     }}
-                    className="appearance-none px-2 py-1 pr-6 text-xs text-gray-700 bg-gray-50 rounded border border-gray-300 hover:border-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer max-w-[140px]"
+                    className="appearance-none px-2 py-1 pr-6 text-xs text-text-secondary bg-background-tertiary rounded border border-border hover:border-border-dark focus:outline-none focus:ring-1 focus:ring-primary-500 cursor-pointer max-w-[140px]"
                   >
                     {availableModels.map((model) => (
                       <option key={model} value={model}>
                         {model}
                       </option>
                     ))}
-                    <option value="__download__" className="text-blue-600 font-medium">
+                    <option value="__download__" className="text-primary-600 font-medium">
                       ⬇ Download more...
                     </option>
                   </select>
                   <div className="absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none">
-                    <svg className="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-3 h-3 text-text-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
                   </div>
                 </div>
                 <button
                   onClick={() => setShowModelSettings(true)}
-                  className="px-1.5 py-1.5 text-gray-600 hover:text-gray-900 transition-colors"
+                  className="px-1.5 py-1.5 text-text-secondary hover:text-text-primary transition-colors"
                   title="Model Settings"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -728,7 +739,7 @@ ALWAYS with triple backticks and webview:type!`;
                         }
                       }
                     }}
-                    className="appearance-none px-2 py-1 pr-6 text-xs text-gray-700 bg-gray-50 rounded border border-gray-300 hover:border-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer max-w-[140px]"
+                    className="appearance-none px-2 py-1 pr-6 text-xs text-text-secondary bg-background-tertiary rounded border border-border hover:border-border-dark focus:outline-none focus:ring-1 focus:ring-primary-500 cursor-pointer max-w-[140px]"
                     title="Select MCP Server for this conversation"
                   >
                     <option value="">No MCP Server</option>
@@ -739,7 +750,7 @@ ALWAYS with triple backticks and webview:type!`;
                     ))}
                   </select>
                   <div className="absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none">
-                    <svg className="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-3 h-3 text-text-tertiary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
                   </div>
@@ -750,7 +761,7 @@ ALWAYS with triple backticks and webview:type!`;
               <button
                 onClick={() => setShowSummary(true)}
                 disabled={messages.length === 0}
-                className="px-3 py-2 text-gray-600 hover:text-gray-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3 py-2 text-text-secondary hover:text-text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 title="Export Chat Summary"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -764,8 +775,8 @@ ALWAYS with triple backticks and webview:type!`;
                   onClick={() => setShowMcpInfo(!showMcpInfo)}
                   className={`px-3 py-2 transition-colors flex items-center gap-1.5 ${
                     showMcpInfo
-                      ? 'text-blue-600 bg-blue-50'
-                      : 'text-gray-600 hover:text-gray-900'
+                      ? 'text-primary-600 bg-primary-50'
+                      : 'text-text-secondary hover:text-text-primary'
                   }`}
                   title="MCP Server Information"
                 >
@@ -779,7 +790,7 @@ ALWAYS with triple backticks and webview:type!`;
               {/* MCP Server Configuration button */}
               <button
                 onClick={() => setShowMcpSettings(true)}
-                className="px-3 py-2 text-gray-600 hover:text-gray-900 transition-colors flex items-center gap-1"
+                className="px-3 py-2 text-text-secondary hover:text-text-primary transition-colors flex items-center gap-1"
                 title="MCP Server Configuration"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -791,13 +802,16 @@ ALWAYS with triple backticks and webview:type!`;
               {/* Help button */}
               <button
                 onClick={() => setShowHelpModal(true)}
-                className="px-3 py-2 text-gray-600 hover:text-gray-900 transition-colors"
+                className="px-3 py-2 text-text-secondary hover:text-text-primary transition-colors"
                 title="MCP Developer Guide"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </button>
+
+              {/* Theme Toggle */}
+              <ThemeToggle />
             </div>
           </div>
         </div>
@@ -808,14 +822,14 @@ ALWAYS with triple backticks and webview:type!`;
             <div className="max-w-6xl mx-auto">
               <div className="flex items-center justify-between mb-3">
                 <div>
-                  <div className="text-sm font-semibold text-blue-900">MCP Server: {currentMcpServer}</div>
-                  <div className="text-xs text-gray-600 mt-1">
+                  <div className="text-sm font-semibold text-primary-900">MCP Server: {currentMcpServer}</div>
+                  <div className="text-xs text-text-secondary mt-1">
                     Ask the AI to use these tools in your conversation
                   </div>
                 </div>
                 <button
                   onClick={() => setShowMcpInfo(false)}
-                  className="text-gray-500 hover:text-gray-700"
+                  className="text-text-tertiary hover:text-text-secondary"
                   title="Close"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -828,17 +842,17 @@ ALWAYS with triple backticks and webview:type!`;
                 {mcpTools.filter(t => t.serverName === currentMcpServer).map(tool => (
                   <div
                     key={`${tool.serverName}-${tool.name}`}
-                    className="bg-white rounded-lg border border-blue-200 px-4 py-3 shadow-sm"
+                    className="bg-background-secondary rounded-lg border border-primary-200 px-4 py-3 shadow-sm"
                   >
                     <div className="flex items-start gap-2">
                       <div className="flex-shrink-0 mt-0.5">
-                        <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="font-medium text-sm text-gray-900">{tool.name}</div>
-                        <div className="text-xs text-gray-600 mt-1">{tool.description}</div>
+                        <div className="font-medium text-sm text-text-primary">{tool.name}</div>
+                        <div className="text-xs text-text-secondary mt-1">{tool.description}</div>
                       </div>
                     </div>
                   </div>
@@ -898,7 +912,7 @@ ALWAYS with triple backticks and webview:type!`;
               </div>
 
               {/* Content - Scrollable with subtle shadow */}
-              <div className="flex-1 overflow-auto bg-gray-50">
+              <div className="flex-1 overflow-auto bg-background-tertiary">
                 <div className="p-6">
                   <WebviewRenderer
                     content={webview.webview}
@@ -908,7 +922,7 @@ ALWAYS with triple backticks and webview:type!`;
               </div>
 
               {/* Footer with helpful info */}
-              <div className="bg-gray-100 border-t border-gray-200 px-6 py-3 flex items-center justify-between text-xs text-gray-600">
+              <div className="bg-surface border-t border-border px-6 py-3 flex items-center justify-between text-xs text-text-secondary">
                 <div className="flex items-center gap-2">
                   <div className={`w-2 h-2 rounded-full ${
                     webview.trustLevel === 'trusted' ? 'bg-green-500' :
@@ -917,7 +931,7 @@ ALWAYS with triple backticks and webview:type!`;
                   }`}></div>
                   <span className="font-medium capitalize">{webview.trustLevel || 'unverified'}</span>
                 </div>
-                <div className="text-gray-500">
+                <div className="text-text-tertiary">
                   Press ESC or click outside to close
                 </div>
               </div>
@@ -934,10 +948,10 @@ ALWAYS with triple backticks and webview:type!`;
 
         {/* Streaming preview */}
         {streamingContent && (
-          <div className="px-4 py-2 bg-blue-50 border-t border-blue-100">
+          <div className="px-4 py-2 bg-primary-50 border-t border-primary-100">
             <div className="max-w-4xl mx-auto">
-              <div className="text-xs text-blue-600 font-medium mb-1">Assistant is typing...</div>
-              <div className="text-sm text-gray-700">{streamingContent}</div>
+              <div className="text-xs text-primary-600 font-medium mb-1">Assistant is typing...</div>
+              <div className="text-sm text-text-secondary">{streamingContent}</div>
             </div>
           </div>
         )}

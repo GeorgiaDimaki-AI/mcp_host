@@ -11,7 +11,7 @@ import dotenv from 'dotenv';
 import { readFileSync, existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { OllamaService, OllamaMessage } from './services/ollama.js';
+import { OllamaService, OllamaMessage, ChatStreamChunk, OllamaToolCall } from './services/ollama.js';
 import { MCPService, MCPServer } from './services/mcp.js';
 import { CertificateService } from './services/certificate.js';
 import { createMCPRouter } from './routes/mcp.js';
@@ -308,6 +308,7 @@ function convertMCPToolsToOllamaFormat(mcpTools: any[]): any[] {
 
 /**
  * Handle chat messages with streaming response and MCP tool integration
+ * Implements tool execution loop with automatic continuation until final response
  */
 async function handleChatMessage(ws: WebSocket, message: any) {
   const { messages, model = DEFAULT_MODEL, options = {}, mcpServer } = message;
@@ -341,19 +342,146 @@ async function handleChatMessage(ws: WebSocket, message: any) {
       }
     }
 
-    // Stream the response
+    // Tool execution loop - continue until LLM provides final content response
+    const MAX_ITERATIONS = 5;
+    let iteration = 0;
+    let conversationMessages = [...ollamaMessages];
     let fullResponse = '';
-    for await (const chunk of ollama.chatStream({
-      model,
-      messages: ollamaMessages,
-      stream: true,
-      tools,
-      options,
-    })) {
-      fullResponse += chunk;
+
+    while (iteration < MAX_ITERATIONS) {
+      iteration++;
+      console.log(`🔄 Tool loop iteration ${iteration}/${MAX_ITERATIONS}`);
+
+      let hasToolCalls = false;
+      let toolCalls: OllamaToolCall[] = [];
+      let iterationContent = '';
+
+      // Stream the response from Ollama
+      for await (const chunk of ollama.chatStream({
+        model,
+        messages: conversationMessages,
+        stream: true,
+        tools,
+        options,
+      })) {
+        if (chunk.type === 'content') {
+          // Stream content to the client
+          const content = chunk.data as string;
+          iterationContent += content;
+          fullResponse += content;
+
+          ws.send(JSON.stringify({
+            type: 'chat_chunk',
+            content: content,
+            timestamp: Date.now(),
+          }));
+        } else if (chunk.type === 'tool_calls') {
+          // Tool calls detected - stop streaming and process
+          hasToolCalls = true;
+          toolCalls = chunk.data as OllamaToolCall[];
+          console.log(`🔧 Tool calls detected: ${toolCalls.length} tool(s)`);
+          break; // Stop streaming when tool calls are detected
+        }
+      }
+
+      // If no tool calls, we're done
+      if (!hasToolCalls) {
+        console.log('✅ Final response received (no tool calls)');
+        break;
+      }
+
+      // Process tool calls
+      console.log(`🛠️  Executing ${toolCalls.length} tool call(s)...`);
+
+      // Add assistant's tool call message to conversation
+      conversationMessages.push({
+        role: 'assistant',
+        content: iterationContent || '',
+        tool_calls: toolCalls,
+      });
+
+      // Execute each tool and collect results
+      for (const toolCall of toolCalls) {
+        const toolName = toolCall.function.name;
+        const toolArgs = toolCall.function.arguments;
+
+        try {
+          // Parse server name and tool name (format: "servername_toolname")
+          const parts = toolName.split('_');
+          if (parts.length < 2) {
+            throw new Error(`Invalid tool name format: ${toolName}`);
+          }
+
+          const serverName = parts[0];
+          const actualToolName = parts.slice(1).join('_');
+
+          console.log(`📞 Calling tool: ${serverName}/${actualToolName}`);
+          console.log(`   Arguments:`, JSON.stringify(toolArgs, null, 2));
+
+          // Notify user about tool execution
+          ws.send(JSON.stringify({
+            type: 'tool_execution',
+            tool: actualToolName,
+            server: serverName,
+            status: 'executing',
+            timestamp: Date.now(),
+          }));
+
+          // Execute the tool via MCP service
+          const result = await mcpService.callTool(serverName, actualToolName, toolArgs);
+
+          console.log(`✅ Tool result:`, JSON.stringify(result, null, 2));
+
+          // Notify user about completion
+          ws.send(JSON.stringify({
+            type: 'tool_execution',
+            tool: actualToolName,
+            server: serverName,
+            status: 'completed',
+            result: result,
+            timestamp: Date.now(),
+          }));
+
+          // Add tool result to conversation
+          conversationMessages.push({
+            role: 'tool',
+            content: JSON.stringify(result),
+          });
+
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          console.error(`❌ Tool execution error for ${toolName}:`, errorMessage);
+
+          // Notify user about error
+          ws.send(JSON.stringify({
+            type: 'tool_execution',
+            tool: toolName,
+            status: 'error',
+            error: errorMessage,
+            timestamp: Date.now(),
+          }));
+
+          // Add error result to conversation
+          conversationMessages.push({
+            role: 'tool',
+            content: JSON.stringify({
+              error: errorMessage,
+              tool: toolName,
+            }),
+          });
+        }
+      }
+
+      // Continue loop to get LLM's response with tool results
+      console.log(`🔁 Continuing conversation with tool results...`);
+    }
+
+    // Check if we hit max iterations
+    if (iteration >= MAX_ITERATIONS) {
+      console.warn(`⚠️  Reached maximum tool execution iterations (${MAX_ITERATIONS})`);
       ws.send(JSON.stringify({
-        type: 'chat_chunk',
-        content: chunk,
+        type: 'warning',
+        message: 'Maximum tool execution iterations reached. Stopping to prevent infinite loop.',
         timestamp: Date.now(),
       }));
     }
@@ -364,6 +492,7 @@ async function handleChatMessage(ws: WebSocket, message: any) {
       fullContent: fullResponse,
       timestamp: Date.now(),
     }));
+
   } catch (error) {
     console.error('Error in chat:', error);
 
