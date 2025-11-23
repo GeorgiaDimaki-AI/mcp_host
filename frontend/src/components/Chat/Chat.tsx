@@ -12,6 +12,7 @@ import { MessageList } from '../MessageList/MessageList';
 import { ChatInput } from './ChatInput';
 import { WebviewRenderer } from '../Webview/WebviewRenderer';
 import { ElicitationDialog, ElicitationRequest } from '../Elicitation/ElicitationDialog';
+import { ToolApprovalDialog, ToolApprovalRequest } from '../ToolApproval/ToolApprovalDialog';
 import { MCPServerSettings } from '../Settings/MCPServerSettings';
 import { ChatSummary } from './ChatSummary';
 import { Sidebar } from '../Sidebar/Sidebar';
@@ -60,6 +61,10 @@ export function Chat() {
 
   // Elicitation state
   const [activeElicitation, setActiveElicitation] = useState<ElicitationRequest | null>(null);
+
+  // Tool approval state
+  const [activeToolApproval, setActiveToolApproval] = useState<ToolApprovalRequest | null>(null);
+  const [approvedToolsForSession, setApprovedToolsForSession] = useState<Set<string>>(new Set());
 
   // Settings state
   const [showMcpSettings, setShowMcpSettings] = useState(false);
@@ -187,7 +192,7 @@ export function Chat() {
     });
 
     return unsubscribe;
-  }, [streamingContent]);
+  }, [streamingContent, conversations, currentConversationId, approvedToolsForSession]);
 
   const handleWebSocketMessage = (message: WebSocketMessage) => {
     switch (message.type) {
@@ -242,6 +247,31 @@ export function Chat() {
           const notif = (message as any).notification;
           const icon = notif.type === 'success' ? '✅' : notif.type === 'error' ? '❌' : notif.type === 'warning' ? '⚠️' : 'ℹ️';
           addSystemMessage(`${icon} ${notif.serverName}: ${notif.message}`);
+        }
+        break;
+
+      case 'tool_approval_request':
+        // Handle tool approval request
+        const approvalMsg = message as any;
+        const toolKey = `${approvalMsg.serverName}:${approvalMsg.toolName}`;
+
+        // Check if tool is already approved for session
+        if (approvedToolsForSession.has(toolKey)) {
+          // Auto-approve
+          wsService.send({
+            type: 'tool_approval_response',
+            requestId: approvalMsg.requestId,
+            decision: 'allow-session',
+          });
+        } else {
+          // Show approval dialog
+          setActiveToolApproval({
+            toolName: approvalMsg.toolName,
+            serverName: approvalMsg.serverName,
+            description: approvalMsg.description,
+            args: approvalMsg.args,
+            requestId: approvalMsg.requestId,
+          });
         }
         break;
 
@@ -574,6 +604,25 @@ ALWAYS with triple backticks and webview:type!`;
     setActiveElicitation(null);
   };
 
+  const handleToolApprovalResponse = (decision: 'allow-once' | 'decline' | 'allow-session') => {
+    if (!activeToolApproval) return;
+
+    // If allow for session, add to approved tools
+    if (decision === 'allow-session') {
+      const toolKey = `${activeToolApproval.serverName}:${activeToolApproval.toolName}`;
+      setApprovedToolsForSession(prev => new Set([...prev, toolKey]));
+    }
+
+    // Send response via WebSocket
+    wsService.send({
+      type: 'tool_approval_response',
+      requestId: activeToolApproval.requestId,
+      decision,
+    });
+
+    setActiveToolApproval(null);
+  };
+
   // Demo functions
   const sendDemoForm = () => {
     handleSendMessage('Create a demo form in a webview with name, email, and a submit button. Use the webview:form syntax.');
@@ -671,8 +720,8 @@ ALWAYS with triple backticks and webview:type!`;
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col">
         {/* Header */}
-        <div className="bg-background-secondary border-b border-border px-4 py-3">
-          <div className="flex items-center justify-between max-w-6xl mx-auto">
+        <div className="bg-background-secondary border-b border-border">
+          <div className="flex items-center justify-between px-4 py-3">
             <div className="flex items-center gap-3 min-w-0">
               <h1 className="text-lg font-semibold text-text-primary truncate">
                 {currentConversation?.title || 'LLM Webview Client'}
@@ -1002,6 +1051,14 @@ ALWAYS with triple backticks and webview:type!`;
           <ElicitationDialog
             request={activeElicitation}
             onResponse={handleElicitationResponse}
+          />
+        )}
+
+        {/* Tool Approval Dialog */}
+        {activeToolApproval && (
+          <ToolApprovalDialog
+            request={activeToolApproval}
+            onResponse={handleToolApprovalResponse}
           />
         )}
 

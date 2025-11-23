@@ -35,7 +35,7 @@ export interface ChatState {
 }
 
 export interface WebSocketMessage {
-  type: 'connected' | 'chat_start' | 'chat_chunk' | 'chat_complete' | 'error' | 'pong' | 'elicitation-request' | 'elicitation-complete' | 'mcp-notification' | 'tool_execution';
+  type: 'connected' | 'chat_start' | 'chat_chunk' | 'chat_complete' | 'error' | 'pong' | 'elicitation-request' | 'elicitation-complete' | 'mcp-notification' | 'tool_execution' | 'tool_approval_request';
   content?: string;
   fullContent?: string;
   message?: string;
@@ -51,7 +51,7 @@ export interface WebSocketMessage {
 }
 
 export interface SendMessageRequest {
-  type: 'chat' | 'ping' | 'elicitation-response';
+  type: 'chat' | 'ping' | 'elicitation-response' | 'tool_approval_response';
   messages?: Array<{
     role: 'user' | 'assistant' | 'system';
     content: string;
@@ -63,8 +63,9 @@ export interface SendMessageRequest {
     top_p?: number;
     top_k?: number;
   };
-  requestId?: string; // For elicitation-response
+  requestId?: string; // For elicitation-response or tool_approval_response
   response?: any; // For elicitation-response
+  decision?: 'allow-once' | 'decline' | 'allow-session'; // For tool_approval_response
 }
 
 export interface MCPTool {
