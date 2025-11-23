@@ -253,14 +253,14 @@ export function Chat() {
       case 'tool_approval_request':
         // Handle tool approval request
         const approvalMsg = message as any;
-        const toolKey = `${approvalMsg.serverName}:${approvalMsg.toolName}`;
+        const serverName = approvalMsg.serverName;
 
-        console.log('[Tool Approval] Request received:', toolKey);
-        console.log('[Tool Approval] Currently approved tools:', Array.from(approvedToolsForSession));
+        console.log('[Tool Approval] Request received for server:', serverName, 'tool:', approvalMsg.toolName);
+        console.log('[Tool Approval] Currently approved servers:', Array.from(approvedToolsForSession));
 
-        // Check if tool is already approved for session
-        if (approvedToolsForSession.has(toolKey)) {
-          console.log('[Tool Approval] Auto-approving tool:', toolKey);
+        // Check if entire server is already approved for session
+        if (approvedToolsForSession.has(serverName)) {
+          console.log('[Tool Approval] Auto-approving - server already trusted:', serverName);
           // Auto-approve
           wsService.send({
             type: 'tool_approval_response',
@@ -268,7 +268,7 @@ export function Chat() {
             decision: 'allow-session',
           });
         } else {
-          console.log('[Tool Approval] Showing approval dialog for:', toolKey);
+          console.log('[Tool Approval] Showing approval dialog for:', serverName, '/', approvalMsg.toolName);
           // Show approval dialog
           setActiveToolApproval({
             toolName: approvalMsg.toolName,
@@ -612,15 +612,15 @@ ALWAYS with triple backticks and webview:type!`;
   const handleToolApprovalResponse = (decision: 'allow-once' | 'decline' | 'allow-session') => {
     if (!activeToolApproval) return;
 
-    const toolKey = `${activeToolApproval.serverName}:${activeToolApproval.toolName}`;
-    console.log('[Tool Approval] User decision:', decision, 'for tool:', toolKey);
+    const serverName = activeToolApproval.serverName;
+    console.log('[Tool Approval] User decision:', decision, 'for server:', serverName);
 
-    // If allow for session, add to approved tools
+    // If allow for session, add entire server to approved list
     if (decision === 'allow-session') {
-      console.log('[Tool Approval] Adding to approved tools:', toolKey);
+      console.log('[Tool Approval] Adding entire server to approved list:', serverName);
       setApprovedToolsForSession(prev => {
-        const newSet = new Set([...prev, toolKey]);
-        console.log('[Tool Approval] Updated approved tools:', Array.from(newSet));
+        const newSet = new Set([...prev, serverName]);
+        console.log('[Tool Approval] Updated approved servers:', Array.from(newSet));
         return newSet;
       });
     }
@@ -1037,7 +1037,7 @@ ALWAYS with triple backticks and webview:type!`;
 
         {/* Streaming preview */}
         {streamingContent && (
-          <div className="px-4 py-2 bg-primary-50 border-t border-primary-100">
+          <div className="px-4 py-2 bg-background-secondary border-t border-border">
             <div className="max-w-4xl mx-auto">
               <div className="text-xs text-primary-600 font-medium mb-1">Assistant is typing...</div>
               <div className="text-sm text-text-secondary">{streamingContent}</div>

@@ -401,6 +401,8 @@ async function handleChatMessage(ws: WebSocket, message: any) {
       });
 
       // Execute each tool and collect results
+      let hasWebviewResult = false; // Track if any tool returned a webview
+
       for (const toolCall of toolCalls) {
         const toolName = toolCall.function.name;
         const toolArgs = toolCall.function.arguments;
@@ -499,6 +501,11 @@ async function handleChatMessage(ws: WebSocket, message: any) {
             timestamp: Date.now(),
           }));
 
+          // Track if this tool returned a webview
+          if (result.hasWebview) {
+            hasWebviewResult = true;
+          }
+
           // Add tool result to conversation
           // For tools with webviews, only send the text content to the LLM
           // The webview HTML is already sent to frontend via tool_execution message
@@ -531,6 +538,13 @@ async function handleChatMessage(ws: WebSocket, message: any) {
             }),
           });
         }
+      }
+
+      // If any tool returned a webview, stop the conversation loop
+      // The webview is already displayed to the user, no need for LLM follow-up
+      if (hasWebviewResult) {
+        console.log(`🎨 Webview displayed - ending conversation loop`);
+        break;
       }
 
       // Continue loop to get LLM's response with tool results
