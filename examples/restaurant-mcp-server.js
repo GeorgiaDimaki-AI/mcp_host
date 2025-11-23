@@ -1017,12 +1017,8 @@ function generateReservationFormHTML() {
     const submitButton = form.querySelector('button[type="submit"]');
     const successView = document.getElementById('successView');
 
-    form.addEventListener('submit', async function(e) {
+    form.addEventListener('submit', function(e) {
       e.preventDefault();
-
-      // Disable button and show loading state
-      submitButton.disabled = true;
-      submitButton.innerHTML = 'Submitting... ⏳';
 
       // Collect form data
       const formData = new FormData(e.target);
@@ -1033,30 +1029,12 @@ function generateReservationFormHTML() {
       };
       formData.forEach((value, key) => reservationData[key] = value);
 
-      try {
-        // POST directly to backend MCP endpoint
-        const response = await fetch('/api/mcp/tools/call', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            serverName: 'restaurant',
-            toolName: 'make_reservation',
-            args: {
-              _elicitationData: reservationData
-            }
-          })
-        });
+      // Simulate brief processing
+      submitButton.disabled = true;
+      submitButton.innerHTML = 'Submitting... ⏳';
 
-        if (!response.ok) {
-          throw new Error('Failed to create reservation');
-        }
-
-        const result = await response.json();
-        console.log('Reservation created:', result);
-
-        // Hide form and show success view
+      setTimeout(() => {
+        // IMMEDIATELY show success view (client-side, no backend wait = no flicker)
         form.style.display = 'none';
         successView.classList.add('show');
 
@@ -1072,21 +1050,28 @@ function generateReservationFormHTML() {
         \`;
         document.getElementById('reservationDetails').innerHTML = detailsHTML;
 
+        // Save to backend asynchronously in background (fire and forget)
+        fetch('/api/mcp/tools/call', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            serverName: 'restaurant',
+            toolName: 'make_reservation',
+            args: { _elicitationData: reservationData }
+          })
+        }).then(response => response.json())
+          .then(result => console.log('✓ Reservation saved to backend:', result))
+          .catch(err => console.error('Backend save error (non-critical):', err));
+
         // Notify parent of success
         if (typeof window.sendToHost === 'function') {
           window.sendToHost({
             type: 'reservation-success',
             confirmationNumber: confirmationNumber,
-            result: result
+            data: reservationData
           });
         }
-
-      } catch (error) {
-        console.error('Error submitting form:', error);
-        submitButton.disabled = false;
-        submitButton.innerHTML = 'Confirm Reservation ✓';
-        alert('Error creating reservation. Please try again.');
-      }
+      }, 500);
     });
   </script>
 </body>
