@@ -207,6 +207,20 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           properties: {}
         },
       },
+      {
+        name: 'secure_payment_demo',
+        description: 'DEMO: Securely collect payment information that bypasses chat history (demonstrates Phase 3 security)',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            amount: {
+              type: 'number',
+              description: 'Payment amount in dollars'
+            }
+          },
+          required: ['amount']
+        },
+      },
     ],
   };
 });
@@ -454,6 +468,27 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               uri: 'webview://chef-special',
               mimeType: 'text/html',
               text: generateChefSpecialHTML(special),
+            },
+          },
+        ],
+      };
+    }
+
+    case 'secure_payment_demo': {
+      const amount = args.amount || 100;
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `🔒 Displaying secure payment form for $${amount.toFixed(2)}. Your payment data will be sent directly to the backend, bypassing chat history.`,
+          },
+          {
+            type: 'resource',
+            resource: {
+              uri: 'webview://secure-payment',
+              mimeType: 'text/html',
+              text: generateSecurePaymentHTML(amount),
             },
           },
         ],
@@ -871,8 +906,23 @@ function generateReservationFormHTML() {
   </div>
 
   <script>
-    document.getElementById('reservationForm').addEventListener('submit', function(e) {
+    const form = document.getElementById('reservationForm');
+    const submitButton = form.querySelector('button[type="submit"]');
+
+    form.addEventListener('submit', function(e) {
       e.preventDefault();
+
+      // Check if sendToHost is available
+      if (typeof window.sendToHost !== 'function') {
+        alert('Error: Unable to submit form. Please make sure the MCP server is trusted.');
+        console.error('window.sendToHost is not available');
+        return;
+      }
+
+      // Disable button and show loading state
+      submitButton.disabled = true;
+      submitButton.innerHTML = 'Submitting... ⏳';
+
       const formData = new FormData(e.target);
       const data = {
         _continueExecution: true,
@@ -883,7 +933,14 @@ function generateReservationFormHTML() {
       };
       formData.forEach((value, key) => data._elicitationData[key] = value);
 
-      window.sendToHost({ type: 'elicitation-response', formData: data });
+      try {
+        window.sendToHost({ type: 'elicitation-response', formData: data });
+      } catch (error) {
+        console.error('Error submitting form:', error);
+        submitButton.disabled = false;
+        submitButton.innerHTML = 'Confirm Reservation ✓';
+        alert('Error submitting reservation. Please try again.');
+      }
     });
   </script>
 </body>
@@ -1544,6 +1601,289 @@ function generateChefSpecialHTML(special) {
       <strong>Chef's Story:</strong> ${special.story}
     </div>
   </div>
+</body>
+</html>
+  `;
+}
+
+function generateSecurePaymentHTML(amount) {
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      padding: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 500px;
+      width: 100%;
+      background: white;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    .header {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: white;
+      text-align: center;
+      padding: 40px 30px;
+    }
+    .header h1 {
+      font-size: 28px;
+      margin-bottom: 8px;
+      font-weight: 700;
+    }
+    .security-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(255, 255, 255, 0.2);
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      margin-top: 12px;
+    }
+    .amount-display {
+      background: #f8f9fa;
+      padding: 24px;
+      text-align: center;
+      border-bottom: 2px solid #e9ecef;
+    }
+    .amount-label {
+      font-size: 14px;
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+    }
+    .amount-value {
+      font-size: 36px;
+      font-weight: 700;
+      color: #059669;
+    }
+    form {
+      padding: 30px;
+    }
+    .form-group {
+      margin-bottom: 20px;
+    }
+    label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #1a1a2e;
+      font-size: 14px;
+    }
+    input {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 16px;
+      font-family: inherit;
+      transition: border-color 0.2s;
+    }
+    input:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+    .card-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    button {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(5, 150, 105, 0.4);
+    }
+    button:disabled {
+      background: #d1d5db;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .security-note {
+      margin-top: 20px;
+      padding: 16px;
+      background: #fef3c7;
+      border-left: 4px solid #f59e0b;
+      border-radius: 8px;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    .security-note strong {
+      color: #92400e;
+      display: block;
+      margin-bottom: 4px;
+    }
+    .security-note p {
+      color: #78350f;
+      margin: 0;
+    }
+    #result {
+      margin-top: 20px;
+      padding: 16px;
+      border-radius: 8px;
+      text-align: center;
+      display: none;
+    }
+    #result.success {
+      background: #d1fae5;
+      color: #065f46;
+      border: 2px solid #10b981;
+    }
+    #result.error {
+      background: #fee2e2;
+      color: #991b1b;
+      border: 2px solid #ef4444;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🔒 Secure Payment</h1>
+      <p>Phase 3 Security Demonstration</p>
+      <div class="security-badge">
+        <svg width="16" height="16" fill="currentColor" viewBox="0 0 20 20">
+          <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/>
+        </svg>
+        Data bypasses chat history
+      </div>
+    </div>
+
+    <div class="amount-display">
+      <div class="amount-label">Payment Amount</div>
+      <div class="amount-value">$${amount.toFixed(2)}</div>
+    </div>
+
+    <form id="paymentForm">
+      <div class="form-group">
+        <label>Cardholder Name *</label>
+        <input type="text" name="cardholderName" placeholder="John Doe" required>
+      </div>
+
+      <div class="form-group">
+        <label>Card Number *</label>
+        <input type="text" name="cardNumber" placeholder="4532 1234 5678 9010" pattern="[0-9 ]+" maxlength="19" required>
+      </div>
+
+      <div class="card-row">
+        <div class="form-group">
+          <label>Expiry Date *</label>
+          <input type="text" name="expiry" placeholder="MM/YY" pattern="[0-9/]+" maxlength="5" required>
+        </div>
+        <div class="form-group">
+          <label>CVV *</label>
+          <input type="password" name="cvv" placeholder="123" pattern="[0-9]+" maxlength="4" required>
+        </div>
+      </div>
+
+      <button type="submit">Submit Secure Payment 🔒</button>
+
+      <div class="security-note">
+        <strong>🔒 Security Demonstration:</strong>
+        <p>This payment data is sent <strong>directly to the backend</strong> via <code>window.sendToBackend()</code>, completely bypassing the chat interface. Your sensitive data never appears in chat history, browser DevTools, or extensions.</p>
+      </div>
+
+      <div id="result"></div>
+    </form>
+  </div>
+
+  <script>
+    const form = document.getElementById('paymentForm');
+    const submitButton = form.querySelector('button[type="submit"]');
+    const resultDiv = document.getElementById('result');
+
+    form.addEventListener('submit', async function(e) {
+      e.preventDefault();
+
+      // Check if sendToBackend is available
+      if (typeof window.sendToBackend !== 'function') {
+        showResult('error', 'Error: window.sendToBackend is not available. Make sure the MCP server is trusted.');
+        return;
+      }
+
+      // Disable button and show loading state
+      submitButton.disabled = true;
+      submitButton.innerHTML = 'Processing securely... 🔒';
+      resultDiv.style.display = 'none';
+
+      const formData = new FormData(e.target);
+      const paymentData = {
+        amount: ${amount},
+        cardholderName: formData.get('cardholderName'),
+        cardNumber: formData.get('cardNumber'),
+        expiry: formData.get('expiry'),
+        cvv: formData.get('cvv'),
+        timestamp: new Date().toISOString()
+      };
+
+      try {
+        // IMPORTANT: This sends data directly to backend, bypassing chat!
+        const result = await window.sendToBackend(paymentData);
+
+        if (result.success) {
+          showResult('success', '✓ Payment processed securely! Data was sent directly to backend without going through chat.');
+          form.reset();
+        } else {
+          showResult('error', '✗ Payment failed: ' + (result.error || 'Unknown error'));
+        }
+      } catch (error) {
+        console.error('Payment error:', error);
+        showResult('error', '✗ Payment error: ' + error.message);
+      } finally {
+        submitButton.disabled = false;
+        submitButton.innerHTML = 'Submit Secure Payment 🔒';
+      }
+    });
+
+    function showResult(type, message) {
+      resultDiv.className = type;
+      resultDiv.textContent = message;
+      resultDiv.style.display = 'block';
+    }
+
+    // Format card number with spaces
+    const cardNumberInput = form.querySelector('[name="cardNumber"]');
+    cardNumberInput.addEventListener('input', function(e) {
+      let value = e.target.value.replace(/\\s/g, '');
+      let formattedValue = value.match(/.{1,4}/g)?.join(' ') || value;
+      e.target.value = formattedValue;
+    });
+
+    // Format expiry date
+    const expiryInput = form.querySelector('[name="expiry"]');
+    expiryInput.addEventListener('input', function(e) {
+      let value = e.target.value.replace(/\\D/g, '');
+      if (value.length >= 2) {
+        value = value.substring(0, 2) + '/' + value.substring(2, 4);
+      }
+      e.target.value = value;
+    });
+  </script>
 </body>
 </html>
   `;
