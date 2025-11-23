@@ -35,9 +35,29 @@ Click each demo button to test:
 - [ ] **CSP Headers** - Check browser console for CSP violations (there should be none)
 
 ### 4. MCP Integration
-- [ ] Click "MCP Tools" button (if configured)
+- [ ] Click "MCP Info" button (if configured)
 - [ ] Check that MCP servers connect (if configured)
 - [ ] Test elicitation forms (if MCP server provides them)
+- [ ] Verify MCP tool calling works (LLM can call tools)
+- [ ] Check tool call status messages display correctly
+
+### 5. Theme System
+- [ ] Click theme toggle in header
+- [ ] Test switching between Light, Dark, and System modes
+- [ ] Verify theme persists after page reload
+- [ ] Test system theme detection (if on Windows/macOS/Linux with dark mode)
+- [ ] Verify theme changes in real-time when OS preference changes (in system mode)
+
+### 6. Conversation Features
+- [ ] Create new conversation
+- [ ] Verify conversation title is auto-generated from first message
+- [ ] Test title truncation with long first messages
+- [ ] Switch between conversations
+- [ ] Delete conversation (with confirmation)
+- [ ] Export conversations to JSON
+- [ ] Import conversations from JSON
+- [ ] View chat summary (both Markdown and Plain Text formats)
+- [ ] Download conversation summary as file
 
 ## Full Test Suite
 
@@ -132,6 +152,181 @@ npm run install:all
 npm run build:all
 ```
 
+## Testing New Features
+
+### Testing Theme System
+
+**Unit Tests Location**: Look for theme-related tests in frontend test files
+
+**Manual Testing Checklist**:
+
+1. **Theme Toggle**
+   ```bash
+   # Open DevTools Console
+   # Check localStorage value changes
+   localStorage.getItem('mcp-host-theme')
+   # Should show: 'light', 'dark', or 'system'
+   ```
+
+2. **System Mode Detection**
+   - Set OS to Dark Mode
+   - Select "System" theme in app
+   - Verify app switches to dark theme automatically
+   - Change OS back to Light Mode
+   - Verify app switches back to light theme
+
+3. **Persistence**
+   - Select a theme
+   - Reload page
+   - Verify same theme is still active
+
+### Testing Conversation Titles
+
+**Manual Testing Checklist**:
+
+1. **Auto-Generation**
+   - Create new conversation
+   - Send first message: "What is quantum computing?"
+   - Title should appear as: "What is quantum computing?"
+
+2. **Truncation**
+   - Send first message with 60+ characters
+   - Title should be truncated to 50 characters with "..."
+
+3. **Empty Conversation**
+   - Create conversation but don't send message
+   - Title should be "New Conversation"
+
+### Testing MCP Tool Calling
+
+**Manual Testing Checklist** (requires configured MCP server):
+
+1. **Tool Call Detection**
+   - Ask LLM to use a tool: "What is 2+2?" (if math tool available)
+   - Monitor console for tool call events
+   - Verify tool call appears in chat as system message
+
+2. **Tool Execution**
+   - Check that tool result displays correctly
+   - Verify LLM uses result in final answer
+   - Check for any error messages
+
+3. **Multiple Tool Calls**
+   - Ask question requiring multiple tool calls
+   - Verify all tool calls execute in sequence
+   - Check results are all displayed
+
+4. **Tool Failures**
+   - Ask tool to do something impossible
+   - Verify error message is shown
+   - Check LLM handles error gracefully
+
+### Testing Conversation Export/Import
+
+**Manual Testing Checklist**:
+
+1. **Export**
+   - Create conversation with multiple messages
+   - Click menu (three dots) in sidebar
+   - Select "Export Conversations"
+   - File downloads successfully
+   - Open file and verify JSON format
+
+2. **Import**
+   - Click menu in sidebar
+   - Select "Import Conversations"
+   - Choose previously exported JSON file
+   - Verify import confirmation message
+   - Check conversations appear in sidebar
+
+3. **Merge**
+   - Have 2 conversations locally
+   - Export them
+   - Delete one conversation
+   - Import the file
+   - Verify both are restored
+
+### Testing Chat Summary
+
+**Manual Testing Checklist**:
+
+1. **Summary Generation**
+   - Create conversation with 5+ messages
+   - Click "Summary" button
+   - Verify Markdown format shows formatted output
+   - Switch to Plain Text format
+   - Verify both formats display correctly
+
+2. **Copy to Clipboard**
+   - Click "Copy to Clipboard"
+   - Verify "Copied!" message appears
+   - Paste into text editor
+   - Verify content is correct
+
+3. **Download**
+   - Click "Download"
+   - File downloads with correct name format
+   - Verify file extension matches format (.md or .txt)
+
+## Performance Testing
+
+### Load Testing
+
+```bash
+# Test with many conversations
+# Create 50+ conversations locally
+# Check:
+# - Sidebar still responsive
+# - No performance degradation
+# - localStorage can handle data
+```
+
+### Memory Testing
+
+```bash
+# DevTools -> Performance
+# 1. Take heap snapshot
+# 2. Create/switch 10 conversations
+# 3. Take another snapshot
+# 4. Compare memory usage
+# - Should be reasonable increase
+# - No memory leaks
+```
+
+## Browser Compatibility Testing
+
+Test on:
+- [ ] Chrome/Chromium (latest)
+- [ ] Firefox (latest)
+- [ ] Safari (latest)
+- [ ] Edge (latest)
+- [ ] Mobile browsers (iOS Safari, Chrome Mobile)
+
+## Automated Testing
+
+Run test suites:
+
+```bash
+# All tests
+npm test
+
+# Frontend only (includes UI component tests)
+npm run test:frontend
+
+# Backend only (includes API and tool calling tests)
+npm run test:backend
+
+# With coverage
+npm run test:coverage
+```
+
+### Test Coverage
+
+Current coverage targets:
+- Backend: 90% route coverage (48 tests)
+- Frontend: 82% component coverage (78 tests)
+- Total: 126 tests
+
 ## Reporting Issues
 
 Found a bug? Please report it at:
@@ -142,3 +337,4 @@ Include:
 - Expected vs actual behavior
 - Browser and OS version
 - Console logs and errors
+- Feature being tested (theme, title generation, tool calling, etc.)

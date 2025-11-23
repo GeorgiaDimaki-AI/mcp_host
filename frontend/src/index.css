@@ -2,10 +2,63 @@
 @tailwind components;
 @tailwind utilities;
 
+/**
+ * Theme Color Variables
+ * WCAG 2.1 AA Compliant contrast ratios
+ */
+
+/* Light Mode - Default */
+:root {
+  /* Background colors */
+  --color-background-primary: 249 250 251;    /* rgb(249, 250, 251) - #f9fafb gray-50 */
+  --color-background-secondary: 255 255 255;  /* rgb(255, 255, 255) - #ffffff white */
+  --color-background-tertiary: 243 244 246;   /* rgb(243, 244, 246) - #f3f4f6 gray-100 */
+
+  /* Surface colors (for cards, inputs, etc.) */
+  --color-surface: 229 231 235;               /* rgb(229, 231, 235) - #e5e7eb gray-200 */
+  --color-surface-hover: 209 213 219;         /* rgb(209, 213, 219) - #d1d5db gray-300 */
+  --color-surface-active: 156 163 175;        /* rgb(156, 163, 175) - #9ca3af gray-400 */
+
+  /* Border colors */
+  --color-border-light: 243 244 246;          /* rgb(243, 244, 246) - #f3f4f6 gray-100 */
+  --color-border: 229 231 235;                /* rgb(229, 231, 235) - #e5e7eb gray-200 */
+  --color-border-dark: 209 213 219;           /* rgb(209, 213, 219) - #d1d5db gray-300 */
+
+  /* Text colors */
+  --color-text-primary: 17 24 39;             /* rgb(17, 24, 39) - #111827 gray-900 */
+  --color-text-secondary: 55 65 81;           /* rgb(55, 65, 81) - #374151 gray-700 */
+  --color-text-tertiary: 107 114 128;         /* rgb(107, 114, 128) - #6b7280 gray-500 */
+}
+
+/* Dark Mode */
+.dark {
+  /* Background colors */
+  --color-background-primary: 17 24 39;       /* rgb(17, 24, 39) - #111827 gray-900 */
+  --color-background-secondary: 31 41 55;     /* rgb(31, 41, 55) - #1f2937 gray-800 */
+  --color-background-tertiary: 55 65 81;      /* rgb(55, 65, 81) - #374151 gray-700 */
+
+  /* Surface colors (for cards, inputs, etc.) */
+  --color-surface: 55 65 81;                  /* rgb(55, 65, 81) - #374151 gray-700 */
+  --color-surface-hover: 75 85 99;            /* rgb(75, 85, 99) - #4b5563 gray-600 */
+  --color-surface-active: 107 114 128;        /* rgb(107, 114, 128) - #6b7280 gray-500 */
+
+  /* Border colors */
+  --color-border-light: 55 65 81;             /* rgb(55, 65, 81) - #374151 gray-700 */
+  --color-border: 75 85 99;                   /* rgb(75, 85, 99) - #4b5563 gray-600 */
+  --color-border-dark: 107 114 128;           /* rgb(107, 114, 128) - #6b7280 gray-500 */
+
+  /* Text colors */
+  --color-text-primary: 249 250 251;          /* rgb(249, 250, 251) - #f9fafb gray-50 */
+  --color-text-secondary: 229 231 235;        /* rgb(229, 231, 235) - #e5e7eb gray-200 */
+  --color-text-tertiary: 156 163 175;         /* rgb(156, 163, 175) - #9ca3af gray-400 */
+}
+
+/* Smooth theme transitions */
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out, color 0.2s ease-in-out;
 }
 
 body {

@@ -4,13 +4,16 @@
 
 import { Chat } from './components/Chat/Chat';
 import { MCPConfigProvider } from './contexts/MCPConfigContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import './index.css';
 
 function App() {
   return (
-    <MCPConfigProvider>
-      <Chat />
-    </MCPConfigProvider>
+    <ThemeProvider>
+      <MCPConfigProvider>
+        <Chat />
+      </MCPConfigProvider>
+    </ThemeProvider>
   );
 }
 
