@@ -194,20 +194,25 @@ describe('ConversationService', () => {
         {
           id: 'msg-1',
           role: 'user',
-          content: 'Hello, how are you?',
+          content: 'Help me debug my React component',
           timestamp: Date.now(),
         },
       ];
 
       const updated = updateConversation(conv.id, { messages });
 
-      expect(updated?.title).toBe('Hello, how are you?');
+      // Title should be generated from message, not be the default
+      expect(updated?.title).not.toBe('New Conversation');
+      // Should contain keywords from the message
+      expect(updated?.title).toMatch(/React|Debug|Component/i);
+      // Should be reasonably short (1-3 words)
+      expect(updated?.title.split(' ').length).toBeLessThanOrEqual(3);
     });
 
-    it('should truncate long titles', () => {
+    it('should generate title for long messages', () => {
       const conv = createConversation();
 
-      const longMessage = 'A'.repeat(60);
+      const longMessage = 'Write me a very long detailed comprehensive explanation about how quantum computing works with entanglement and superposition';
       const messages: Message[] = [
         {
           id: 'msg-1',
@@ -219,8 +224,13 @@ describe('ConversationService', () => {
 
       const updated = updateConversation(conv.id, { messages });
 
-      expect(updated?.title).toHaveLength(53); // 50 chars + '...'
-      expect(updated?.title).toMatch(/^A{50}\.\.\.$/);
+      // Title should be generated, not the full message
+      expect(updated?.title).not.toBe('New Conversation');
+      expect(updated?.title).not.toBe(longMessage);
+      // Should be a reasonable length (max 50 chars)
+      expect(updated?.title.length).toBeLessThanOrEqual(50);
+      // Should be 1-3 words
+      expect(updated?.title.split(' ').length).toBeLessThanOrEqual(3);
     });
 
     it('should not regenerate title if already set', () => {
@@ -264,14 +274,18 @@ describe('ConversationService', () => {
         {
           id: 'msg-2',
           role: 'user',
-          content: 'User question',
+          content: 'Help me with Python programming',
           timestamp: Date.now(),
         },
       ];
 
       const updated = updateConversation(conv.id, { messages });
 
-      expect(updated?.title).toBe('User question');
+      // Title should be generated from user message, not system message
+      expect(updated?.title).not.toBe('New Conversation');
+      expect(updated?.title).not.toContain('System');
+      // Should contain keywords from user message
+      expect(updated?.title).toMatch(/Python|Help|Programming/i);
     });
   });
 

@@ -174,7 +174,8 @@ describe('Sidebar', () => {
 
       const { container } = render(<Sidebar {...mockProps} conversations={conversations} currentConversationId="conv-1" />);
 
-      const currentConv = container.querySelector('.bg-blue-50.border-blue-200');
+      // Find the highlighted conversation using primary background color class
+      const currentConv = container.querySelector('.bg-primary-50');
       expect(currentConv).toBeInTheDocument();
       expect(currentConv?.textContent).toContain('Current');
     });
