@@ -255,8 +255,12 @@ export function Chat() {
         const approvalMsg = message as any;
         const toolKey = `${approvalMsg.serverName}:${approvalMsg.toolName}`;
 
+        console.log('[Tool Approval] Request received:', toolKey);
+        console.log('[Tool Approval] Currently approved tools:', Array.from(approvedToolsForSession));
+
         // Check if tool is already approved for session
         if (approvedToolsForSession.has(toolKey)) {
+          console.log('[Tool Approval] Auto-approving tool:', toolKey);
           // Auto-approve
           wsService.send({
             type: 'tool_approval_response',
@@ -264,6 +268,7 @@ export function Chat() {
             decision: 'allow-session',
           });
         } else {
+          console.log('[Tool Approval] Showing approval dialog for:', toolKey);
           // Show approval dialog
           setActiveToolApproval({
             toolName: approvalMsg.toolName,
@@ -607,10 +612,17 @@ ALWAYS with triple backticks and webview:type!`;
   const handleToolApprovalResponse = (decision: 'allow-once' | 'decline' | 'allow-session') => {
     if (!activeToolApproval) return;
 
+    const toolKey = `${activeToolApproval.serverName}:${activeToolApproval.toolName}`;
+    console.log('[Tool Approval] User decision:', decision, 'for tool:', toolKey);
+
     // If allow for session, add to approved tools
     if (decision === 'allow-session') {
-      const toolKey = `${activeToolApproval.serverName}:${activeToolApproval.toolName}`;
-      setApprovedToolsForSession(prev => new Set([...prev, toolKey]));
+      console.log('[Tool Approval] Adding to approved tools:', toolKey);
+      setApprovedToolsForSession(prev => {
+        const newSet = new Set([...prev, toolKey]);
+        console.log('[Tool Approval] Updated approved tools:', Array.from(newSet));
+        return newSet;
+      });
     }
 
     // Send response via WebSocket
@@ -740,19 +752,19 @@ ALWAYS with triple backticks and webview:type!`;
               {/* Demo buttons */}
               <button
                 onClick={sendDemoForm}
-                className="px-3 py-1.5 text-xs bg-surface text-text-secondary rounded hover:bg-surface-hover transition-colors"
+                className="px-2 py-1.5 text-[11px] bg-surface text-text-secondary rounded hover:bg-surface-hover transition-colors whitespace-nowrap"
               >
                 Demo Form
               </button>
               <button
                 onClick={sendDemoChart}
-                className="px-3 py-1.5 text-xs bg-surface text-text-secondary rounded hover:bg-surface-hover transition-colors"
+                className="px-2 py-1.5 text-[11px] bg-surface text-text-secondary rounded hover:bg-surface-hover transition-colors whitespace-nowrap"
               >
                 Demo Chart
               </button>
               <button
                 onClick={sendDemoCalculator}
-                className="px-3 py-1.5 text-xs bg-surface text-text-secondary rounded hover:bg-surface-hover transition-colors"
+                className="px-2 py-1.5 text-[11px] bg-surface text-text-secondary rounded hover:bg-surface-hover transition-colors whitespace-nowrap"
               >
                 Demo Calc
               </button>
