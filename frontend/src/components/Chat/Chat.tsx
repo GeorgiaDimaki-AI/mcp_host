@@ -516,16 +516,39 @@ export function Chat() {
 
     // Add system prompt at the beginning
     // Use custom system prompt from settings, or default assistant prompt
+
+    // MCP-aware instructions when tools are available
+    const mcpInstructions = currentMcpServer ? `
+
+---
+🔧 MCP TOOLS AVAILABLE - IMPORTANT INSTRUCTIONS 🔧
+
+You have access to specialized tools from the "${currentMcpServer}" MCP server. When the user's request can be fulfilled using these tools, you MUST use them via function calling.
+
+⚠️ CRITICAL: Use the standard function calling format that your model supports. DO NOT output JSON manually in code blocks.
+
+✅ CORRECT: Let the model's built-in function calling handle it
+❌ WRONG: Outputting \`\`\`json {"type":"function"...} \`\`\`
+
+When to use tools:
+- If the user asks for something a tool provides → Use the tool
+- If a tool can better fulfill the request → Use the tool
+- Only generate content manually if NO tool is suitable
+
+After using a tool, the result will be shown to the user automatically. Just provide a brief confirmation or explanation.
+` : '';
+
     const webviewInstructions = `
 
 ---
-🔴 CRITICAL WEBVIEW RENDERING RULE - READ CAREFULLY 🔴
+${currentMcpServer ? '🎨 MANUAL WEBVIEW INSTRUCTIONS (Only when tools cannot help)' : '🔴 CRITICAL WEBVIEW RENDERING RULE - READ CAREFULLY 🔴'}
 
-When the user asks for HTML content, forms, charts, calculators, or interactive UIs, you MUST ONLY respond using MARKDOWN CODE BLOCKS with the webview:type syntax.
+When the user asks for HTML content, forms, charts, calculators, or interactive UIs${currentMcpServer ? ' AND no tool is available to handle it' : ''}, you MUST ONLY respond using MARKDOWN CODE BLOCKS with the webview:type syntax.
 
 ⛔ NEVER EVER output raw HTML tags directly ⛔
 ⛔ NEVER use <webview> tags ⛔
 ⛔ NEVER write <div>, <form>, <html> outside of code blocks ⛔
+⛔ NEVER output function calls as JSON in code blocks ⛔
 
 ✅ ONLY CORRECT FORMAT (with triple backticks):
 \`\`\`webview:html
@@ -571,10 +594,11 @@ Example - Chart/Visualization:
 ❌ <webview type="webview:html">content</webview>
 ❌ <div>content</div> (without code blocks)
 ❌ \`\`\`html ... \`\`\` (plain html, not webview:type)
+❌ \`\`\`json {"type":"function"...} \`\`\` (this is NOT how to call functions!)
 ❌ Any HTML tags outside of code blocks
 
 🎯 GOLDEN RULE:
-If user asks for HTML → Use \`\`\`webview:html
+${currentMcpServer ? '1. Check if a tool can handle the request → Use the tool\n2. If no tool available and user needs HTML → Use \`\`\`webview:html' : 'If user asks for HTML → Use \`\`\`webview:html'}
 If user asks for form → Use \`\`\`webview:form
 If user asks for chart/table/viz → Use \`\`\`webview:result
 ALWAYS with triple backticks and webview:type!`;
@@ -582,8 +606,8 @@ ALWAYS with triple backticks and webview:type!`;
     const systemPrompt = {
       role: 'system' as const,
       content: modelSettings.systemPrompt
-        ? `${modelSettings.systemPrompt}${webviewInstructions}`
-        : `You are a helpful AI assistant with the ability to render interactive HTML content.${webviewInstructions}`,
+        ? `${modelSettings.systemPrompt}${mcpInstructions}${webviewInstructions}`
+        : `You are a helpful AI assistant with the ability to render interactive HTML content and use specialized tools.${mcpInstructions}${webviewInstructions}`,
     };
 
     try {
