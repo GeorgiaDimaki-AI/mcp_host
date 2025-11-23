@@ -41,6 +41,9 @@ export function Chat() {
   // Track previous conversation to prevent cross-contamination when switching
   const previousConversationIdRef = useRef<string | null>(null);
 
+  // Ref for streaming content auto-scroll
+  const streamingContentRef = useRef<HTMLDivElement>(null);
+
   // Current conversation derived state
   const currentConversation = conversations.find(c => c.id === currentConversationId) || null;
   const messages = currentConversation?.messages || [];
@@ -118,6 +121,13 @@ export function Chat() {
 
     previousConversationIdRef.current = currentConversationId;
   }, [messages, currentConversationId, currentModel, modelSettings]);
+
+  // Auto-scroll streaming content to bottom
+  useEffect(() => {
+    if (streamingContentRef.current) {
+      streamingContentRef.current.scrollTop = streamingContentRef.current.scrollHeight;
+    }
+  }, [streamingContent]);
 
   // Handle settings close - reload MCP config in case it was updated
   const handleMcpSettingsClose = () => {
@@ -1059,7 +1069,7 @@ ALWAYS with triple backticks and webview:type!`;
           <div className="px-4 py-2 bg-background-secondary border-t border-border">
             <div className="max-w-4xl mx-auto">
               <div className="text-xs text-primary-600 font-medium mb-1">Assistant is typing...</div>
-              <div className="text-sm text-text-secondary max-h-64 overflow-y-auto">{streamingContent}</div>
+              <div ref={streamingContentRef} className="text-sm text-text-secondary max-h-64 overflow-y-auto">{streamingContent}</div>
             </div>
           </div>
         )}
