@@ -35,7 +35,7 @@ export interface ChatState {
 }
 
 export interface WebSocketMessage {
-  type: 'connected' | 'chat_start' | 'chat_chunk' | 'chat_complete' | 'error' | 'pong' | 'elicitation-request' | 'elicitation-complete' | 'mcp-notification';
+  type: 'connected' | 'chat_start' | 'chat_chunk' | 'chat_complete' | 'error' | 'pong' | 'elicitation-request' | 'elicitation-complete' | 'mcp-notification' | 'tool_execution';
   content?: string;
   fullContent?: string;
   message?: string;
@@ -44,6 +44,10 @@ export interface WebSocketMessage {
   request?: any; // For elicitation-request
   data?: any; // For elicitation-complete
   notification?: any; // For mcp-notification
+  tool?: string; // For tool_execution
+  server?: string; // For tool_execution
+  status?: 'executing' | 'completed' | 'error'; // For tool_execution
+  result?: MCPToolResult; // For tool_execution
 }
 
 export interface SendMessageRequest {
