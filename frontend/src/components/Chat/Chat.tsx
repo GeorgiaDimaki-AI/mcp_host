@@ -48,11 +48,6 @@ export function Chat() {
   // Ref for chat input to programmatically focus
   const chatInputRef = useRef<ChatInputRef>(null);
 
-  // Refs to avoid stale closure bugs in WebSocket message handler (Bug #3)
-  const conversationsRef = useRef(conversations);
-  const currentConversationIdRef = useRef(currentConversationId);
-  const approvedToolsForSessionRef = useRef(approvedToolsForSession);
-
   // Current conversation derived state
   const currentConversation = conversations.find(c => c.id === currentConversationId) || null;
   const messages = currentConversation?.messages || [];
@@ -88,8 +83,24 @@ export function Chat() {
   const [showSummary, setShowSummary] = useState(false);
   const [showHelpModal, setShowHelpModal] = useState(false);
 
+  // Refs to avoid stale closure bugs in WebSocket message handler (Bug #3)
+  // Must be declared AFTER state variables they reference
+  const conversationsRef = useRef(conversations);
+  const currentConversationIdRef = useRef(currentConversationId);
+  const approvedToolsForSessionRef = useRef(approvedToolsForSession);
+
   // MCP configuration context
   const { getTrustLevel, reload: reloadMcpConfig } = useMCPConfig();
+
+  // Conversation management function (needs to be declared before keyboard shortcuts use it)
+  const handleCreateConversation = useCallback(() => {
+    const defaultModel = availableModels.length > 0 ? availableModels[0] : 'llama3.2';
+    const newConv = createConversation(defaultModel);
+    setConversations(prev => [newConv, ...prev]);
+    setCurrentConversationId(newConv.id);
+    // Clear approved servers for new conversation
+    setApprovedToolsForSession(new Set());
+  }, [availableModels]);
 
   // Keyboard shortcuts
   useKeyboardShortcuts({
@@ -787,15 +798,6 @@ ALWAYS with triple backticks and webview:type!`;
   };
 
   // Conversation management functions
-  const handleCreateConversation = () => {
-    const defaultModel = availableModels.length > 0 ? availableModels[0] : 'llama3.2';
-    const newConv = createConversation(defaultModel);
-    setConversations(prev => [newConv, ...prev]);
-    setCurrentConversationId(newConv.id);
-    // Clear approved servers for new conversation
-    setApprovedToolsForSession(new Set());
-  };
-
   const handleSelectConversation = (id: string) => {
     setCurrentConversationId(id);
 
