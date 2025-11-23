@@ -10,12 +10,11 @@
  * - Uses semantic color tokens for theme support
  */
 
-import React, { useState } from 'react';
+import React from 'react';
 import { useTheme, ThemeMode } from '../../contexts/ThemeContext';
 
 export function ThemeToggle() {
   const { theme, resolvedTheme, setTheme } = useTheme();
-  const [showTooltip, setShowTooltip] = useState(false);
 
   const themes: { mode: ThemeMode; icon: React.ReactNode; label: string }[] = [
     {
@@ -77,40 +76,17 @@ export function ThemeToggle() {
   };
 
   return (
-    <div className="relative">
-      <button
-        onClick={handleToggleTheme}
-        onMouseEnter={() => setShowTooltip(true)}
-        onMouseLeave={() => setShowTooltip(false)}
-        onFocus={() => setShowTooltip(true)}
-        onBlur={() => setShowTooltip(false)}
-        className="p-2 rounded-lg bg-background-secondary text-text-secondary
-                   hover:bg-surface-hover transition-all duration-200
-                   focus:outline-none focus:ring-2 focus:ring-primary-500
-                   focus:ring-offset-2 focus:ring-offset-background-primary
-                   border border-border active:scale-95"
-        title={`Current theme: ${getTooltipText()}. Click to switch to ${nextTheme.label}`}
-        aria-label={`Theme selector. Current: ${getTooltipText()}. Click to cycle through themes.`}
-      >
-        {themes[currentThemeIndex].icon}
-      </button>
-
-      {/* Tooltip */}
-      {showTooltip && (
-        <div
-          className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2
-                     px-3 py-1.5 bg-background-secondary border border-border
-                     text-text-primary text-sm rounded-md shadow-lg
-                     whitespace-nowrap pointer-events-none z-50"
-          role="tooltip"
-        >
-          {getTooltipText()}
-          <div
-            className="absolute top-full left-1/2 -translate-x-1/2
-                       border-4 border-transparent border-t-background-secondary"
-          />
-        </div>
-      )}
-    </div>
+    <button
+      onClick={handleToggleTheme}
+      className="p-2 rounded-lg bg-background-secondary text-text-secondary
+                 hover:bg-surface-hover transition-all duration-200
+                 focus:outline-none focus:ring-2 focus:ring-primary-500
+                 focus:ring-offset-2 focus:ring-offset-background-primary
+                 border border-border active:scale-95"
+      title={`Current theme: ${getTooltipText()}. Click to switch to ${nextTheme.label}`}
+      aria-label={`Theme selector. Current: ${getTooltipText()}. Click to cycle through themes.`}
+    >
+      {themes[currentThemeIndex].icon}
+    </button>
   );
 }
