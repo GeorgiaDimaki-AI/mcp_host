@@ -263,7 +263,13 @@ export function Chat() {
               mcpServer: toolMsg.server,
             },
           };
-          updateMessages([...messages, webviewMessage]);
+
+          // Get current messages from conversation to avoid stale closure
+          if (!currentConversationId) return;
+          const currentConv = conversations.find(c => c.id === currentConversationId);
+          if (currentConv) {
+            updateMessages([...currentConv.messages, webviewMessage]);
+          }
         }
         break;
     }
