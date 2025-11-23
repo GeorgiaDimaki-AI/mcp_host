@@ -3,6 +3,7 @@
  * Tests for MCP service including Phase 3 security features
  */
 
+import { jest } from '@jest/globals';
 import { MCPService, ElicitationResponse } from '../services/mcp.js';
 
 describe('MCPService', () => {
@@ -151,6 +152,178 @@ describe('MCPService', () => {
       });
 
       mcpService.emit('elicitation-complete', completeData);
+    });
+  });
+
+  describe('MCP Resource Handling', () => {
+    test('should extract HTML from resource blocks', () => {
+      // Mock response with resource containing HTML webview
+      const mockResponse = {
+        content: [
+          { type: 'text', text: 'Created todo list: My To-Do List' },
+          {
+            type: 'resource',
+            resource: {
+              uri: 'webview://todo-list',
+              mimeType: 'text/html',
+              text: '<div class="todo-list"><h1>My To-Do List</h1></div>',
+            },
+          },
+        ],
+      };
+
+      // Create a mock client
+      const mockClient = {
+        callTool: jest.fn<() => Promise<any>>().mockResolvedValue(mockResponse),
+      };
+
+      // Replace the client in the service
+      (mcpService as any).clients.set('test-server', mockClient);
+
+      return mcpService.callTool('test-server', 'create_todo_list', { title: 'My To-Do List' })
+        .then(result => {
+          expect(result.hasWebview).toBe(true);
+          expect(result.webviewType).toBe('html');
+          expect(result.webviewHtml).toBe('<div class="todo-list"><h1>My To-Do List</h1></div>');
+          expect(result.content).toBe('Created todo list: My To-Do List');
+        });
+    });
+
+    test('should handle text + resource combination', () => {
+      const mockResponse = {
+        content: [
+          { type: 'text', text: 'Operation completed successfully.' },
+          { type: 'text', text: 'Additional info here.' },
+          {
+            type: 'resource',
+            resource: {
+              uri: 'webview://result',
+              mimeType: 'text/html',
+              text: '<div>HTML Result</div>',
+            },
+          },
+        ],
+      };
+
+      const mockClient = {
+        callTool: jest.fn<() => Promise<any>>().mockResolvedValue(mockResponse),
+      };
+
+      (mcpService as any).clients.set('test-server', mockClient);
+
+      return mcpService.callTool('test-server', 'test_tool', {})
+        .then(result => {
+          expect(result.hasWebview).toBe(true);
+          expect(result.webviewHtml).toBe('<div>HTML Result</div>');
+          expect(result.content).toContain('Operation completed successfully.');
+          expect(result.content).toContain('Additional info here.');
+        });
+    });
+
+    test('should maintain backward compatibility with markdown webview syntax', () => {
+      const mockResponse = {
+        content: [
+          {
+            type: 'text',
+            text: 'Here is the result:\n```webview:html\n<div>Legacy HTML</div>\n```',
+          },
+        ],
+      };
+
+      const mockClient = {
+        callTool: jest.fn<() => Promise<any>>().mockResolvedValue(mockResponse),
+      };
+
+      (mcpService as any).clients.set('test-server', mockClient);
+
+      return mcpService.callTool('test-server', 'legacy_tool', {})
+        .then(result => {
+          expect(result.hasWebview).toBe(true);
+          expect(result.webviewType).toBe('html');
+          expect(result.webviewHtml).toBe('<div>Legacy HTML</div>');
+          expect(result.content).toBe('Here is the result:');
+        });
+    });
+
+    test('should handle text-only responses without resources', () => {
+      const mockResponse = {
+        content: [
+          { type: 'text', text: 'Simple text response' },
+        ],
+      };
+
+      const mockClient = {
+        callTool: jest.fn<() => Promise<any>>().mockResolvedValue(mockResponse),
+      };
+
+      (mcpService as any).clients.set('test-server', mockClient);
+
+      return mcpService.callTool('test-server', 'simple_tool', {})
+        .then(result => {
+          expect(result.hasWebview).toBe(false);
+          expect(result.content).toBe('Simple text response');
+          expect(result.webviewHtml).toBeUndefined();
+        });
+    });
+
+    test('should ignore non-HTML resources', () => {
+      const mockResponse = {
+        content: [
+          { type: 'text', text: 'Data response' },
+          {
+            type: 'resource',
+            resource: {
+              uri: 'data://json',
+              mimeType: 'application/json',
+              text: '{"key": "value"}',
+            },
+          },
+        ],
+      };
+
+      const mockClient = {
+        callTool: jest.fn<() => Promise<any>>().mockResolvedValue(mockResponse),
+      };
+
+      (mcpService as any).clients.set('test-server', mockClient);
+
+      return mcpService.callTool('test-server', 'data_tool', {})
+        .then(result => {
+          expect(result.hasWebview).toBe(false);
+          expect(result.content).toBe('Data response');
+        });
+    });
+
+    test('should prioritize resource webview over markdown syntax', () => {
+      const mockResponse = {
+        content: [
+          {
+            type: 'text',
+            text: 'Legacy: ```webview:html\n<div>Old</div>\n```',
+          },
+          {
+            type: 'resource',
+            resource: {
+              uri: 'webview://new',
+              mimeType: 'text/html',
+              text: '<div>New HTML</div>',
+            },
+          },
+        ],
+      };
+
+      const mockClient = {
+        callTool: jest.fn<() => Promise<any>>().mockResolvedValue(mockResponse),
+      };
+
+      (mcpService as any).clients.set('test-server', mockClient);
+
+      return mcpService.callTool('test-server', 'mixed_tool', {})
+        .then(result => {
+          expect(result.hasWebview).toBe(true);
+          expect(result.webviewHtml).toBe('<div>New HTML</div>');
+          expect(result.webviewType).toBe('html');
+        });
     });
   });
 });

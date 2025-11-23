@@ -274,36 +274,56 @@ export class MCPService extends EventEmitter {
         arguments: args,
       });
 
-      // Extract content from response
-      let content = '';
+      // Extract text content and resource items
+      let textContent = '';
+      let webviewHtml = '';
+      let hasWebview = false;
+
       if (Array.isArray(response.content)) {
-        content = response.content
-          .map(item => {
-            if (item.type === 'text') {
-              return item.text;
+        for (const item of response.content) {
+          if (item.type === 'text') {
+            textContent += item.text + '\n';
+          } else if (item.type === 'resource' && item.resource) {
+            // Check if resource contains HTML webview
+            if (item.resource.mimeType === 'text/html' && item.resource.text) {
+              hasWebview = true;
+              webviewHtml = item.resource.text;
             }
-            return '';
-          })
-          .join('\n');
+          }
+        }
       }
 
-      // Parse for webview content
-      const webviewMatch = content.match(/```webview:(\w+)\n([\s\S]*?)```/);
+      // Trim the text content
+      textContent = textContent.trim();
 
-      if (webviewMatch) {
-        const [fullMatch, type, html] = webviewMatch;
-        const contentWithoutWebview = content.replace(fullMatch, '').trim();
+      // Still check for markdown webview syntax as fallback (backward compatibility)
+      if (!hasWebview) {
+        const webviewMatch = textContent.match(/```webview:(\w+)\n([\s\S]*?)```/);
+        if (webviewMatch) {
+          const [fullMatch, type, html] = webviewMatch;
+          const contentWithoutWebview = textContent.replace(fullMatch, '').trim();
 
+          return {
+            content: contentWithoutWebview,
+            hasWebview: true,
+            webviewType: type as 'form' | 'result' | 'html',
+            webviewHtml: html.trim(),
+          };
+        }
+      }
+
+      // Return result with resource-based webview if found
+      if (hasWebview) {
         return {
-          content: contentWithoutWebview,
+          content: textContent,
           hasWebview: true,
-          webviewType: type as 'form' | 'result' | 'html',
-          webviewHtml: html.trim(),
+          webviewType: 'html',
+          webviewHtml,
         };
       }
 
       return {
-        content,
+        content: textContent,
         hasWebview: false,
       };
     } catch (error) {
