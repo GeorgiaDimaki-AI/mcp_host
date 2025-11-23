@@ -51,7 +51,7 @@ describe('MCPConfigContext', () => {
       });
 
       expect(result.current.servers).toEqual(mockConfig.mcpServers);
-      expect(mockFetch).toHaveBeenCalledWith('http://localhost:3001/api/mcp/config');
+      expect(mockFetch).toHaveBeenCalledWith('http://localhost:3000/api/mcp/config');
     });
 
     it('should handle empty configuration', async () => {

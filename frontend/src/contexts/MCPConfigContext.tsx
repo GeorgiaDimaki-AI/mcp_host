@@ -29,7 +29,7 @@ export function MCPConfigProvider({ children }: { children: ReactNode }) {
 
   const loadConfig = async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/mcp/config');
+      const response = await fetch('http://localhost:3000/api/mcp/config');
       if (!response.ok) {
         console.error('Failed to load MCP configuration');
         return;

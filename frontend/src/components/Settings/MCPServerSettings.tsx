@@ -43,7 +43,7 @@ export function MCPServerSettings({ isOpen, onClose }: MCPServerSettingsProps) {
 
   const loadServers = async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/mcp/config');
+      const response = await fetch('http://localhost:3000/api/mcp/config');
       if (!response.ok) throw new Error('Failed to load MCP configuration');
 
       const data = await response.json();
@@ -60,7 +60,7 @@ export function MCPServerSettings({ isOpen, onClose }: MCPServerSettingsProps) {
     setSuccess(null);
 
     try {
-      const response = await fetch('http://localhost:3001/api/mcp/config', {
+      const response = await fetch('http://localhost:3000/api/mcp/config', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mcpServers: servers }),
